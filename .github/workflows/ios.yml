@@ -1,0 +1,68 @@
+name: iOS IPA derle
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: iOS proje dosyalarını oluştur
+        run: |
+          if [ ! -d ios ]; then
+            flutter create --platforms=ios --org com.jellyplus --project-name jellyplus .
+          fi
+          rm -f test/widget_test.dart
+
+      - name: Paketleri indir
+        run: flutter pub get
+
+      - name: Uygulama simgesi
+        run: dart run flutter_launcher_icons || echo "simge oluşturulamadı, varsayılan kullanılacak"
+
+      - name: Info.plist ayarları (HTTP izni, ad, yönler)
+        run: |
+          P=ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$P" || true
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$P"
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$P"
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoadsForMedia bool true" "$P"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Jelly+" "$P" || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Jelly+" "$P"
+          /usr/libexec/PlistBuddy -c "Delete :UIStatusBarStyle" "$P" || true
+          /usr/libexec/PlistBuddy -c "Add :UIStatusBarStyle string UIStatusBarStyleLightContent" "$P"
+          /usr/libexec/PlistBuddy -c "Delete :UIViewControllerBasedStatusBarAppearance" "$P" || true
+          /usr/libexec/PlistBuddy -c "Add :UIViewControllerBasedStatusBarAppearance bool true" "$P"
+          /usr/libexec/PlistBuddy -c "Delete :UISupportedInterfaceOrientations" "$P" || true
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations array" "$P"
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait" "$P"
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:1 string UIInterfaceOrientationLandscapeLeft" "$P"
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:2 string UIInterfaceOrientationLandscapeRight" "$P"
+
+      - name: Kod kontrolü (hatalar burada görünür)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
+
+      - name: iOS derle (imzasız)
+        run: flutter build ios --release --no-codesign
+
+      - name: IPA paketle
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry JellyPlus.ipa Payload
+          ls -lh JellyPlus.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JellyPlus-ipa
+          path: JellyPlus.ipa
+          retention-days: 30
