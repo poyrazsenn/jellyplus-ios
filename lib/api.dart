@@ -201,6 +201,8 @@ class Api {
   set subLang(String v) => prefs.setString('psub', v);
   bool get autoSkip => prefs.getBool('auto') ?? false;
   set autoSkip(bool v) => prefs.setBool('auto', v);
+  bool get compat => prefs.getBool('compat') ?? false;
+  set compat(bool v) => prefs.setBool('compat', v);
   double get subSize => prefs.getDouble('subsize') ?? 1.0;
   set subSize(double v) => prefs.setDouble('subsize', v);
 

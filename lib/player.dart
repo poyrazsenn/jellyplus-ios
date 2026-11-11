@@ -101,6 +101,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? hideT, repT, ageT;
   Offset tapAt = Offset.zero;
   double speed = 1;
+  bool compat = Api.I.compat; // uyumlu mod: videoyu sunucu H.264'e çevirir
+  Timer? vidT;
 
   List<J> get streams =>
       ((ms?['MediaStreams'] as List?) ?? const []).map((e) => J.from(e as Map)).toList();
@@ -119,6 +121,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     hideT?.cancel();
     repT?.cancel();
     ageT?.cancel();
+    vidT?.cancel();
     if (!closed) _stopCurrent();
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -181,15 +184,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
+  J? get _video {
+    for (final s in streams) {
+      if (s['Type'] == 'Video') return s;
+    }
+    return null;
+  }
+
+  /// Dolby Vision iPhone oynatıcısında siyah/yanlış renkli görüntü verebiliyor
+  bool get _dovi {
+    final v = _video;
+    final r = '${v?['VideoRangeType'] ?? ''} ${v?['VideoDoViTitle'] ?? ''}'.toUpperCase();
+    return r.contains('DOVI') || r.contains('DOLBY VISION');
+  }
+
   bool _canDirect() {
     final m = ms!;
     final cont = '${m['Container'] ?? ''}'.toLowerCase().split(',');
-    final v = streams.where((s) => s['Type'] == 'Video').toList();
+    final v = _video;
     final a = streams.where((s) => s['Index'] == audioIdx).toList();
-    final vcod = v.isNotEmpty ? '${v.first['Codec']}'.toLowerCase() : '';
+    final vcod = '${v?['Codec'] ?? ''}'.toLowerCase();
+    final tag = '${v?['CodecTag'] ?? ''}'.toLowerCase();
     final ac = a.isNotEmpty ? '${a.first['Codec']}'.toLowerCase() : 'aac';
+    // HEVC sadece "hvc1" etiketliyse doğrudan oynar; "hev1" iPhone'da siyah ekran verir
+    final videoOk = vcod == 'h264' || (['hevc', 'h265'].contains(vcod) && tag == 'hvc1' && !_dovi);
     return cont.any((c) => ['mp4', 'm4v', 'mov'].contains(c)) &&
-        ['h264', 'hevc', 'h265'].contains(vcod) &&
+        videoOk &&
         ['aac', 'ac3', 'eac3', 'mp3', 'alac', 'flac'].contains(ac);
   }
 
@@ -197,10 +217,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (opening) return;
     opening = true;
     final id = '${it!['Id']}', msId = '${ms!['Id']}';
-    transcode = forceHls || burn || audioIdx != defAudio || !_canDirect();
+    transcode = compat || forceHls || burn || audioIdx != defAudio || !_canDirect();
+    final vcodecs = (compat || _dovi) ? 'h264' : 'h264,hevc';
     final q = 'MediaSourceId=$msId&DeviceId=${api.deviceId}&api_key=${api.token}&PlaySessionId=$sid';
     final url = transcode
-        ? '${api.url}/Videos/$id/master.m3u8?$q&VideoCodec=h264,hevc&AudioCodec=aac,ac3,eac3'
+        ? '${api.url}/Videos/$id/master.m3u8?$q&VideoCodec=$vcodecs&AudioCodec=aac,ac3,eac3'
             '&TranscodingMaxAudioChannels=6&SegmentContainer=mp4&MinSegments=1&BreakOnNonKeyFrames=True'
             '&MaxStreamingBitrate=40000000&VideoBitrate=40000000&AudioBitrate=384000'
             '${audioIdx != null ? '&AudioStreamIndex=$audioIdx' : ''}'
@@ -233,9 +254,39 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await c.setPlaybackSpeed(speed);
     await c.play();
     _report('');
+    _watchVideo(c);
     repT?.cancel();
     repT = Timer.periodic(const Duration(seconds: 10), (_) => _report('/Progress'));
     _armHide();
+  }
+
+  /// Ses/altyazı ilerliyor ama görüntü gelmiyorsa uyumlu moda geç
+  void _watchVideo(VideoPlayerController c) {
+    vidT?.cancel();
+    if (compat || _video == null) return;
+    vidT = Timer(const Duration(seconds: 6), () {
+      if (!mounted || vc != c || compat) return;
+      final v = c.value;
+      if (v.isInitialized && v.position > const Duration(seconds: 2) && (v.size.width < 2 || v.size.height < 2)) {
+        compat = true;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Görüntü gelmedi, uyumlu moda (H.264) geçiliyor…'), duration: Duration(seconds: 3)));
+        _reopen();
+      }
+    });
+  }
+
+  String _info() {
+    final v = _video, m = ms;
+    final src = [
+      '${m?['Container'] ?? '?'}'.toUpperCase(),
+      '${v?['Codec'] ?? '?'}'.toUpperCase() + (v?['CodecTag'] != null ? ' (${v!['CodecTag']})' : ''),
+      if (v?['Width'] != null) '${v?['Width']}×${v?['Height']}',
+      if (v?['VideoRangeType'] != null) '${v!['VideoRangeType']}',
+    ].join(' • ');
+    final s = vc?.value.size ?? Size.zero;
+    return 'Kaynak: $src\nOynatma: ${transcode ? 'Sunucu dönüştürüyor (HLS${compat || _dovi ? ', H.264' : ''})' : 'Doğrudan oynatma'}'
+        '\nOynatıcıdaki görüntü: ${s.width.round()}×${s.height.round()}';
   }
 
   Future<void> _report(String kind) async {
@@ -546,6 +597,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   Navigator.pop(c);
                   _selectSub((s['Index'] as num).toInt());
                 }, sub: s['IsTextSubtitleStream'] == true ? null : 'Resim altyazı — sunucu videoya gömer'),
+              head('GÖRÜNTÜ'),
+              SwitchListTile(
+                dense: true,
+                title: const Text('Uyumlu mod (H.264)'),
+                subtitle: const Text('Görüntü gelmiyorsa aç. Sunucu videoyu dönüştürür.',
+                    style: TextStyle(color: kMuted, fontSize: 11)),
+                value: compat,
+                onChanged: (v) {
+                  Navigator.pop(c);
+                  compat = v;
+                  api.compat = v;
+                  _reopen();
+                },
+              ),
+              ListTile(
+                dense: true,
+                title: const Text('Akış bilgisi'),
+                subtitle: Text(_info(), style: const TextStyle(color: kMuted, fontSize: 11)),
+              ),
               head('OTOMATİK ATLA'),
               SwitchListTile(
                 dense: true,
