@@ -3,7 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'api.dart';
@@ -16,12 +17,6 @@ class _Seg {
   final Duration a, b;
   bool done = false;
   _Seg(this.type, this.a, this.b);
-}
-
-class _Cue {
-  final Duration a, b;
-  final String t;
-  _Cue(this.a, this.b, this.t);
 }
 
 const _lmap = {
@@ -37,43 +32,6 @@ const _lmap = {
   'ru': ['rus', 'ru'],
 };
 
-List<_Cue> _parseVtt(String s) {
-  final out = <_Cue>[];
-  final lines = s.replaceAll('\r', '').split('\n');
-  final re = RegExp(r'((?:\d+:)?\d{1,2}:\d{2}[.,]\d{1,3})\s*-->\s*((?:\d+:)?\d{1,2}:\d{2}[.,]\d{1,3})');
-  Duration t(String x) {
-    final p = x.replaceAll(',', '.').split(':');
-    final sec = double.parse(p.last);
-    final m = int.parse(p[p.length - 2]);
-    final h = p.length > 2 ? int.parse(p[0]) : 0;
-    return Duration(milliseconds: ((h * 3600 + m * 60 + sec) * 1000).round());
-  }
-
-  for (var i = 0; i < lines.length; i++) {
-    final m = re.firstMatch(lines[i]);
-    if (m == null) continue;
-    final buf = <String>[];
-    var j = i + 1;
-    while (j < lines.length && lines[j].trim().isNotEmpty) {
-      buf.add(lines[j]);
-      j++;
-    }
-    final txt = buf
-        .join('\n')
-        .replaceAll(RegExp(r'<[^>]+>'), '')
-        .replaceAll(RegExp(r'\{\\[^}]*\}'), '')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&nbsp;', ' ')
-        .trim();
-    if (txt.isNotEmpty) out.add(_Cue(t(m.group(1)!), t(m.group(2)!), txt));
-    i = j;
-  }
-  out.sort((a, b) => a.a.compareTo(b.a));
-  return out;
-}
-
 class PlayerScreen extends StatefulWidget {
   final J item;
   final bool restart;
@@ -82,31 +40,33 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
+/// Oynatıcı: mpv (media_kit). MKV dahil dosyalar sunucuda dönüştürülmeden doğrudan oynar;
+/// altyazı ve ses dosyanın kendi zamanlamasıyla gelir. Sadece resim altyazılar (PGS vb.)
+/// için sunucu altyazıyı videoya gömer (HLS).
 class _PlayerScreenState extends State<PlayerScreen> {
   final api = Api.I;
-  VideoPlayerController? vc;
-  J? it, ms, series;
+  late final Player player = Player(configuration: PlayerConfiguration(bufferSize: 64 * 1024 * 1024));
+  late final VideoController vctl = VideoController(player);
+  final List<StreamSubscription> subs = [];
+
+  J? it, ms;
   String sid = '';
-  bool transcode = false, forceHls = false, burn = false, opening = false, closed = false;
+  bool transcode = false, burn = false, closed = false, ready = false;
   int? audioIdx, subIdx, defAudio;
-  List<_Cue> cues = [];
   List<_Seg> segs = [];
   List<J> eps = [];
   J? nextEp;
   String err = '';
   bool ui = true, ended = false, showAge = false, dragging = false;
   double dragV = 0;
-  Duration pos = Duration.zero, dur = Duration.zero;
+  Duration pos = Duration.zero, dur = Duration.zero, painted = Duration.zero;
   bool playing = false, buffering = true;
-  Timer? hideT, repT, ageT, subT;
+  Timer? hideT, repT, ageT;
   Duration subDelay = Duration.zero; // + geç, − erken
-  DateTime posAt = DateTime.now();
   String? shownCue;
   Offset tapAt = Offset.zero;
   double speed = 1;
-  int hlsTry = 0; // 0: fMP4 + 6 kanal, 1: klasik TS + stereo AAC (web istemcisinin ayarı)
-  bool compat = Api.I.compat; // uyumlu mod: videoyu sunucu H.264'e çevirir
-  Timer? vidT;
+  int openTok = 0;
 
   List<J> get streams =>
       ((ms?['MediaStreams'] as List?) ?? const []).map((e) => J.from(e as Map)).toList();
@@ -117,12 +77,38 @@ class _PlayerScreenState extends State<PlayerScreen> {
     SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
-    // Altyazıyı oynatıcının 0,5 sn'lik konum güncellemesini beklemeden, 100 ms'de bir eşle
-    subT = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!mounted) return;
-      final t = _cueAt(_subPos);
-      if (t != shownCue) setState(() => shownCue = t);
-    });
+    subs.addAll([
+      player.stream.position.listen((p) {
+        pos = p;
+        _onPos();
+      }),
+      player.stream.duration.listen((d) => dur = d),
+      player.stream.playing.listen((p) {
+        if (p == playing) return;
+        playing = p;
+        if (ready) _report('/Progress');
+        if (mounted) setState(() {});
+        if (p) _armHide();
+      }),
+      player.stream.buffering.listen((b) {
+        if (mounted) setState(() => buffering = b);
+      }),
+      player.stream.completed.listen((c) {
+        if (c && ready && !ended) {
+          ended = true;
+          _onEnded();
+        }
+      }),
+      player.stream.subtitle.listen((l) {
+        final t = l.where((s) => s.trim().isNotEmpty).join('\n').trim();
+        final v = t.isEmpty ? null : t;
+        if (v != shownCue && mounted) setState(() => shownCue = v);
+      }),
+      player.stream.error.listen((e) {
+        if (!mounted) return;
+        if (!ready && err.isEmpty) setState(() => err = 'Video açılamadı.\n\n$e\n\n${_info()}');
+      }),
+    ]);
     _start(widget.item, restart: widget.restart);
   }
 
@@ -131,13 +117,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
     hideT?.cancel();
     repT?.cancel();
     ageT?.cancel();
-    vidT?.cancel();
-    subT?.cancel();
+    for (final s in subs) {
+      s.cancel();
+    }
     if (!closed) _stopCurrent();
+    player.dispose();
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     allowAppOrientations();
     super.dispose();
+  }
+
+  void _onPos() {
+    if (!mounted) return;
+    // giriş / jenerik otomatik atla
+    final s = _activeSeg();
+    if (s != null && api.autoSkip && !s.done && ready) {
+      s.done = true;
+      player.seek(s.b);
+    }
+    // ekranı en fazla ~4 kez/sn yenile
+    if (dragging) return;
+    if ((pos - painted).abs() >= const Duration(milliseconds: 250) || pos < painted) {
+      painted = pos;
+      setState(() {});
+    }
   }
 
   // =================== akış ===================
@@ -153,14 +157,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       err = '';
       ended = false;
       segs = [];
-      cues = [];
       nextEp = null;
       buffering = true;
       pos = Duration.zero;
       dur = Duration.zero;
-      forceHls = false;
       burn = false;
-      hlsTry = 0;
+      shownCue = null;
     });
     J full;
     try {
@@ -178,19 +180,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ms = J.from(sources.first as Map);
     sid = _newSid();
     final aud = streams.where((s) => s['Type'] == 'Audio').toList();
-    defAudio = (ms!['DefaultAudioStreamIndex'] as num?)?.toInt() ?? (aud.isNotEmpty ? (aud.first['Index'] as num).toInt() : null);
+    defAudio = (ms!['DefaultAudioStreamIndex'] as num?)?.toInt() ??
+        (aud.isNotEmpty ? (aud.first['Index'] as num).toInt() : null);
     audioIdx = defAudio;
     subIdx = _autoSub();
-    final startAt = restart
-        ? Duration.zero
-        : ticks((full['UserData'] as Map?)?['PlaybackPositionTicks'] ?? 0);
+    final startAt = restart ? Duration.zero : ticks((full['UserData'] as Map?)?['PlaybackPositionTicks'] ?? 0);
     await _open(startAt);
-    _loadSubs();
     _loadSegments();
     _loadEpisodes();
     // Netflix/Disney+ tarzı yaş kartı
     ageT?.cancel();
-    setState(() => showAge = true);
+    if (mounted) setState(() => showAge = true);
     ageT = Timer(const Duration(seconds: 8), () {
       if (mounted) setState(() => showAge = false);
     });
@@ -203,143 +203,117 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return null;
   }
 
-  /// Dolby Vision iPhone oynatıcısında siyah/yanlış renkli görüntü verebiliyor
-  bool get _dovi {
-    final v = _video;
-    final r = '${v?['VideoRangeType'] ?? ''} ${v?['VideoDoViTitle'] ?? ''}'.toUpperCase();
-    return r.contains('DOVI') || r.contains('DOLBY VISION');
-  }
-
-  bool _canDirect() {
-    final m = ms!;
-    final cont = '${m['Container'] ?? ''}'.toLowerCase().split(',');
-    final v = _video;
-    final a = streams.where((s) => s['Index'] == audioIdx).toList();
-    final vcod = '${v?['Codec'] ?? ''}'.toLowerCase();
-    final tag = '${v?['CodecTag'] ?? ''}'.toLowerCase();
-    final ac = a.isNotEmpty ? '${a.first['Codec']}'.toLowerCase() : 'aac';
-    // HEVC sadece "hvc1" etiketliyse doğrudan oynar; "hev1" iPhone'da siyah ekran verir
-    final videoOk = vcod == 'h264' || (['hevc', 'h265'].contains(vcod) && tag == 'hvc1' && !_dovi);
-    return cont.any((c) => ['mp4', 'm4v', 'mov'].contains(c)) &&
-        videoOk &&
-        ['aac', 'ac3', 'eac3', 'mp3', 'alac', 'flac'].contains(ac);
-  }
-
   Future<void> _open(Duration startAt) async {
-    if (opening) return;
-    opening = true;
+    final tok = ++openTok;
     final id = '${it!['Id']}', msId = '${ms!['Id']}';
-    transcode = compat || forceHls || burn || audioIdx != defAudio || !_canDirect();
-    final vcodecs = (compat || _dovi) ? 'h264' : 'h264,hevc';
+    transcode = burn;
     final q = 'MediaSourceId=$msId&DeviceId=${api.deviceId}&ApiKey=${api.token}&PlaySessionId=$sid';
-    final prof = hlsTry == 0
-        ? 'VideoCodec=$vcodecs&AudioCodec=aac,ac3,eac3&TranscodingMaxAudioChannels=6&SegmentContainer=mp4'
-            '&MaxStreamingBitrate=40000000&VideoBitrate=40000000&AudioBitrate=384000'
-        : 'VideoCodec=h264&AudioCodec=aac&TranscodingMaxAudioChannels=2&SegmentContainer=ts'
-            '&MaxStreamingBitrate=20000000&VideoBitrate=20000000&AudioBitrate=192000';
     final url = transcode
-        ? '${api.url}/Videos/$id/master.m3u8?$q&$prof&MinSegments=1&BreakOnNonKeyFrames=True'
+        ? '${api.url}/Videos/$id/master.m3u8?$q&VideoCodec=h264&AudioCodec=aac&TranscodingMaxAudioChannels=2'
+            '&SegmentContainer=ts&MinSegments=1&BreakOnNonKeyFrames=True&MaxStreamingBitrate=20000000'
             '${audioIdx != null ? '&AudioStreamIndex=$audioIdx' : ''}'
-            '${burn && subIdx != null ? '&SubtitleStreamIndex=$subIdx&SubtitleMethod=Encode' : ''}'
-        : '${api.url}/Videos/$id/stream.mp4?static=true&$q';
-    final old = vc;
-    final c = VideoPlayerController.networkUrl(Uri.parse(url),
-        formatHint: transcode ? VideoFormat.hls : null,
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false));
-    vc = c;
+            '${subIdx != null ? '&SubtitleStreamIndex=$subIdx&SubtitleMethod=Encode' : ''}'
+        : '${api.url}/Videos/$id/stream?static=true&$q';
+    ready = false;
     if (mounted) setState(() => buffering = true);
-    old?.removeListener(_tick);
-    old?.dispose();
     try {
-      await c.initialize();
+      await player.open(Media(url), play: false);
     } catch (e) {
-      opening = false;
-      if (vc != c) return;
-      if (!transcode) {
-        forceHls = true; // doğrudan oynatma olmadı → sunucu dönüştürsün
-        return _open(startAt);
-      }
-      if (hlsTry == 0) {
-        hlsTry = 1; // klasik ayarlarla bir kez daha dene
-        _killEncoding();
-        sid = _newSid();
-        return _open(startAt);
-      }
-      final why = await _probe(url);
-      if (mounted) {
-        setState(() => err = 'Video açılamadı.\n\n$why\n\nOynatıcı hatası: ${e is PlatformException ? (e.message ?? e.code) : e}\n\n${_info()}');
-      }
+      if (mounted && tok == openTok) setState(() => err = 'Video açılamadı.\n\n$e\n\n${_info()}');
       return;
     }
-    opening = false;
-    if (!mounted || vc != c) return;
-    c.addListener(_tick);
-    if (startAt > const Duration(seconds: 1)) await c.seekTo(startAt);
-    await c.setPlaybackSpeed(speed);
-    await c.play();
+    // süre gelene kadar bekle (dosya açıldı demektir)
+    if (player.state.duration <= Duration.zero) {
+      try {
+        await player.stream.duration.firstWhere((d) => d > Duration.zero).timeout(const Duration(seconds: 30));
+      } catch (_) {}
+    }
+    if (!mounted || tok != openTok) return;
+    if (player.state.duration <= Duration.zero && err.isEmpty) {
+      setState(() => err = 'Video açılamadı (sunucudan cevap gelmedi).\n\n${_info()}');
+      return;
+    }
+    // parça listesi gelsin
+    if (player.state.tracks.audio.length <= 2) {
+      try {
+        await player.stream.tracks.firstWhere((t) => t.audio.length > 2).timeout(const Duration(seconds: 4));
+      } catch (_) {}
+    }
+    if (!mounted || tok != openTok) return;
+    if (startAt > const Duration(seconds: 1)) await player.seek(startAt);
+    if (!transcode) await _applyAudio();
+    await _applySub();
+    await _applyDelay();
+    await player.setRate(speed);
+    await player.play();
+    ready = true;
     _report('');
-    _watchVideo(c);
     repT?.cancel();
     repT = Timer.periodic(const Duration(seconds: 10), (_) => _report('/Progress'));
     _armHide();
   }
 
-  void _killEncoding() {
-    api.delete('/Videos/ActiveEncodings?DeviceId=${api.deviceId}&PlaySessionId=$sid').catchError((_) {});
+  // ---- Jellyfin akış sırası → mpv parça sırası (aynı dosya, aynı sıra) ----
+  List<J> _embedded(String type) =>
+      streams.where((s) => s['Type'] == type && s['IsExternal'] != true).toList();
+
+  Future<void> _applyAudio() async {
+    final k = _embedded('Audio').indexWhere((s) => s['Index'] == audioIdx);
+    final real = player.state.tracks.audio.where((t) => t.id != 'auto' && t.id != 'no').toList();
+    if (k >= 0 && k < real.length) await player.setAudioTrack(real[k]);
   }
 
-  /// Sunucunun akış adresine verdiği cevabı oku (hatanın nedenini göstermek için)
-  Future<String> _probe(String url) async {
-    try {
-      final t = await api.getText(url);
-      return t.contains('#EXTM3U') ? 'Sunucu akışı oluşturdu ama iPhone oynatamadı.' : 'Sunucu beklenmeyen cevap verdi.';
-    } catch (e) {
-      if (e is ApiError) {
-        if (e.code == 401 || e.code == 403) return 'Sunucu dönüştürmeye izin vermiyor ($e). Jellyfin kullanıcı ayarlarında "dönüştürme gerektiren oynatmaya izin ver" açık mı?';
-        return 'Sunucu dönüştürmeyi başlatamadı ($e). Jellyfin → Pano → Günlükler bölümündeki en yeni FFmpeg.Transcode günlüğü nedenini gösterir.';
-      }
-      return 'Sunucuya ulaşılamadı: $e';
+  Future<void> _applySub() async {
+    if (burn || subIdx == null) {
+      await player.setSubtitleTrack(SubtitleTrack.no());
+      if (mounted) setState(() => shownCue = null);
+      return;
+    }
+    final s = streams.firstWhere((x) => x['Index'] == subIdx, orElse: () => <String, dynamic>{});
+    if (s.isEmpty) return;
+    if (s['IsExternal'] == true) {
+      // indirilmiş/yan dosya altyazı: sunucudan al
+      await player.setSubtitleTrack(SubtitleTrack.uri(
+        '${api.url}/Videos/${it!['Id']}/${ms!['Id']}/Subtitles/$subIdx/0/Stream.srt?ApiKey=${api.token}',
+        title: '${s['DisplayTitle'] ?? s['Title'] ?? 'Altyazı'}',
+        language: '${s['Language'] ?? ''}',
+      ));
+    } else {
+      final k = _embedded('Subtitle').indexWhere((x) => x['Index'] == subIdx);
+      final real = player.state.tracks.subtitle.where((t) => t.id != 'auto' && t.id != 'no').toList();
+      if (k >= 0 && k < real.length) await player.setSubtitleTrack(real[k]);
     }
   }
 
-  /// Ses/altyazı ilerliyor ama görüntü gelmiyorsa uyumlu moda geç
-  void _watchVideo(VideoPlayerController c) {
-    vidT?.cancel();
-    if (compat || _video == null) return;
-    vidT = Timer(const Duration(seconds: 6), () {
-      if (!mounted || vc != c || compat) return;
-      final v = c.value;
-      if (v.isInitialized && v.position > const Duration(seconds: 2) && (v.size.width < 2 || v.size.height < 2)) {
-        compat = true;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Görüntü gelmedi, uyumlu moda (H.264) geçiliyor…'), duration: Duration(seconds: 3)));
-        _reopen();
-      }
-    });
+  Future<void> _applyDelay() async {
+    try {
+      await (player.platform as dynamic).setProperty('sub-delay', (subDelay.inMilliseconds / 1000).toStringAsFixed(3));
+    } catch (_) {}
   }
 
   String _info() {
     final v = _video, m = ms;
+    final a = streams.where((s) => s['Index'] == audioIdx).toList();
     final src = [
       '${m?['Container'] ?? '?'}'.toUpperCase(),
-      '${v?['Codec'] ?? '?'}'.toUpperCase() + (v?['CodecTag'] != null ? ' (${v!['CodecTag']})' : ''),
+      '${v?['Codec'] ?? '?'}'.toUpperCase(),
       if (v?['Width'] != null) '${v?['Width']}×${v?['Height']}',
-      if (v?['VideoRangeType'] != null) '${v!['VideoRangeType']}',
+      if (v?['VideoRangeType'] != null) '${v?['VideoRangeType']}',
+      if (a.isNotEmpty) 'Ses: ${'${a.first['Codec'] ?? ''}'.toUpperCase()} ${a.first['Channels'] ?? ''}ch',
     ].join(' • ');
-    final s = vc?.value.size ?? Size.zero;
-    return 'Kaynak: $src\nOynatma: ${transcode ? 'Sunucu dönüştürüyor (HLS${compat || _dovi ? ', H.264' : ''})' : 'Doğrudan oynatma'}'
-        '\nOynatıcıdaki görüntü: ${s.width.round()}×${s.height.round()}';
+    return 'Kaynak: $src\nOynatma: ${transcode ? 'Sunucu resim altyazıyı videoya gömüyor (HLS)' : 'Doğrudan oynatma (mpv, sunucuda dönüştürme yok)'}'
+        '\nGörüntü: ${player.state.width ?? 0}×${player.state.height ?? 0}';
   }
 
   Future<void> _report(String kind) async {
-    final c = vc, i = it;
-    if (c == null || i == null || !c.value.isInitialized) return;
+    final i = it;
+    if (i == null || !ready) return;
     final body = <String, dynamic>{
       'ItemId': i['Id'],
       'MediaSourceId': ms?['Id'],
       'PlaySessionId': sid,
-      'PositionTicks': c.value.position.inMicroseconds * 10,
-      'IsPaused': !c.value.isPlaying,
+      'PositionTicks': player.state.position.inMicroseconds * 10,
+      'IsPaused': !player.state.playing,
       'CanSeek': true,
       'PlayMethod': transcode ? 'Transcode' : 'DirectPlay',
       if (audioIdx != null) 'AudioStreamIndex': audioIdx,
@@ -352,67 +326,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _stopCurrent() async {
     repT?.cancel();
-    final c = vc;
-    if (c == null) return;
+    if (it == null) return;
     await _report('/Stopped');
     if (transcode) {
       api.delete('/Videos/ActiveEncodings?DeviceId=${api.deviceId}&PlaySessionId=$sid').catchError((_) {});
     }
-    c.removeListener(_tick);
-    vc = null;
-    await c.dispose();
+    ready = false;
+    try {
+      await player.stop();
+    } catch (_) {}
   }
 
-  /// Aynı içerikte ses/altyazı değişince akışı kaldığı yerden yeniden aç
+  /// Sunucu tarafı gömme açılıp kapanınca akışı kaldığı yerden yeniden aç
   Future<void> _reopen() async {
-    final at = vc?.value.position ?? pos;
+    final at = player.state.position;
     await _report('/Stopped');
     if (transcode) {
       api.delete('/Videos/ActiveEncodings?DeviceId=${api.deviceId}&PlaySessionId=$sid').catchError((_) {});
     }
     sid = _newSid();
     await _open(at);
-  }
-
-  void _tick() {
-    final c = vc;
-    if (c == null || !mounted) return;
-    final v = c.value;
-    if (v.hasError && err.isEmpty && !opening) {
-      if (!transcode) {
-        forceHls = true;
-        _open(v.position);
-        return;
-      }
-      if (hlsTry == 0) {
-        hlsTry = 1;
-        _killEncoding();
-        sid = _newSid();
-        _open(v.position);
-        return;
-      }
-      setState(() => err = 'Oynatma hatası: ${v.errorDescription ?? ''}\n\n${_info()}');
-      return;
-    }
-    final was = playing;
-    if (v.position != pos) posAt = DateTime.now();
-    pos = v.position;
-    dur = v.duration;
-    playing = v.isPlaying;
-    buffering = v.isBuffering && !playing;
-    if (was != playing) _report('/Progress');
-    // giriş / jenerik
-    final s = _activeSeg();
-    if (s != null && api.autoSkip && !s.done) {
-      s.done = true;
-      c.seekTo(s.b);
-    }
-    // bitti mi
-    if (!ended && dur > Duration.zero && pos >= dur - const Duration(milliseconds: 800) && !playing) {
-      ended = true;
-      _onEnded();
-    }
-    setState(() {});
   }
 
   _Seg? _activeSeg() {
@@ -422,37 +355,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return null;
   }
 
-  /// Son bilinen konum + o andan beri geçen süre (oynarken)
-  Duration get _subPos {
-    var p = pos;
-    if (playing) {
-      final e = DateTime.now().difference(posAt);
-      if (e < const Duration(seconds: 2)) p += e * speed;
-    }
-    return p - subDelay;
-  }
-
-  String? _cueAt(Duration pos) {
-    if (cues.isEmpty || subIdx == null || burn) return null;
-    // ikili arama
-    var lo = 0, hi = cues.length - 1, f = -1;
-    while (lo <= hi) {
-      final mid = (lo + hi) >> 1;
-      if (cues[mid].a <= pos) {
-        f = mid;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    final out = <String>[];
-    for (var k = f; k >= 0 && k > f - 4; k--) {
-      if (cues[k].a <= pos && pos < cues[k].b) out.insert(0, cues[k].t);
-    }
-    return out.isEmpty ? null : out.join('\n');
-  }
-
-  // =================== altyazı ===================
+  // =================== altyazı / ses seçimi ===================
   int? _autoSub() {
     final codes = _lmap[api.subLang];
     if (codes == null) return null;
@@ -473,22 +376,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return (pick['Index'] as num).toInt();
   }
 
-  Future<void> _loadSubs() async {
-    final id = it?['Id'], idx = subIdx;
-    if (id == null || idx == null || burn) {
-      setState(() => cues = []);
-      return;
-    }
-    try {
-      final txt = await api.getText(
-          '${api.url}/Videos/$id/${ms!['Id']}/Subtitles/$idx/0/Stream.vtt');
-      if (!mounted || it?['Id'] != id || subIdx != idx) return;
-      setState(() => cues = _parseVtt(txt));
-    } catch (_) {
-      if (mounted) setState(() => cues = []);
-    }
-  }
-
   Future<void> _selectSub(int? idx) async {
     final s = idx == null ? null : streams.firstWhere((x) => x['Index'] == idx, orElse: () => <String, dynamic>{});
     final needBurn = s != null && s.isNotEmpty && s['IsTextSubtitleStream'] != true;
@@ -496,18 +383,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     setState(() {
       subIdx = idx;
       burn = needBurn;
-      cues = [];
     });
     if (needBurn || wasBurn) {
-      await _reopen(); // resim tabanlı altyazı (PGS vb.) → sunucu videoya gömer
+      await _reopen(); // resim altyazı (PGS vb.) → sunucu videoya gömer; ya da gömmeden çık
+    } else {
+      await _applySub();
     }
-    _loadSubs();
+    _report('/Progress');
   }
 
   Future<void> _selectAudio(int idx) async {
     if (idx == audioIdx) return;
     setState(() => audioIdx = idx);
-    await _reopen();
+    if (transcode) {
+      await _reopen();
+    } else {
+      await _applyAudio(); // mpv'de anında değişir
+    }
+    _report('/Progress');
   }
 
   // =================== giriş/jenerik, bölümler ===================
@@ -580,19 +473,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _togglePlay() {
-    final c = vc;
-    if (c == null) return;
-    c.value.isPlaying ? c.pause() : c.play();
+    player.playOrPause();
     _showUI();
   }
 
   void _seekBy(int s) {
-    final c = vc;
-    if (c == null) return;
-    var t = c.value.position + Duration(seconds: s);
+    var t = player.state.position + Duration(seconds: s);
     if (t < Duration.zero) t = Duration.zero;
     if (dur > Duration.zero && t > dur) t = dur;
-    c.seekTo(t);
+    player.seek(t);
     _showUI();
   }
 
@@ -636,7 +525,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       selected: speed == s,
                       onSelected: (_) {
                         speed = s;
-                        vc?.setPlaybackSpeed(s);
+                        player.setRate(s);
                         Navigator.pop(c);
                       },
                     ),
@@ -660,14 +549,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
               StatefulBuilder(builder: (c2, set2) {
                 final ms = subDelay.inMilliseconds;
                 final lab = ms == 0 ? '0 sn' : '${ms > 0 ? '+' : ''}${(ms / 1000).toStringAsFixed(2)} sn';
-                void adj(int d) => set2(() => subDelay += Duration(milliseconds: d));
+                void adj(int d) {
+                  set2(() => subDelay += Duration(milliseconds: d));
+                  _applyDelay();
+                }
                 return ListTile(
                   dense: true,
                   title: const Text('Altyazı zamanlaması'),
                   subtitle: Text('$lab   (+ geç, − erken gösterir)', style: const TextStyle(color: kMuted, fontSize: 11)),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => adj(-250)),
-                    IconButton(icon: const Icon(Icons.restart_alt), onPressed: () => set2(() => subDelay = Duration.zero)),
+                    IconButton(icon: const Icon(Icons.restart_alt), onPressed: () {
+                          set2(() => subDelay = Duration.zero);
+                          _applyDelay();
+                        }),
                     IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => adj(250)),
                   ]),
                 );
@@ -682,20 +577,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   _subSearch();
                 },
               ),
-              head('GÖRÜNTÜ'),
-              SwitchListTile(
-                dense: true,
-                title: const Text('Uyumlu mod (H.264)'),
-                subtitle: const Text('Görüntü gelmiyorsa aç. Sunucu videoyu dönüştürür.',
-                    style: TextStyle(color: kMuted, fontSize: 11)),
-                value: compat,
-                onChanged: (v) {
-                  Navigator.pop(c);
-                  compat = v;
-                  api.compat = v;
-                  _reopen();
-                },
-              ),
+              head('BİLGİ'),
               ListTile(
                 dense: true,
                 title: const Text('Akış bilgisi'),
@@ -927,7 +809,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // =================== çizim ===================
   @override
   Widget build(BuildContext context) {
-    final c = vc;
     final i = it;
     final seg = _activeSeg();
     final nearEnd = dur > Duration.zero && dur - pos < const Duration(seconds: 40);
@@ -951,10 +832,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
         onDoubleTap: () => _seekBy(tapAt.dx < MediaQuery.sizeOf(context).width / 2 ? -10 : 10),
         child: Stack(children: [
           // video
-          Center(
-            child: c != null && c.value.isInitialized
-                ? AspectRatio(aspectRatio: c.value.aspectRatio, child: VideoPlayer(c))
-                : const SizedBox.shrink(),
+          Positioned.fill(
+            child: Video(
+              controller: vctl,
+              controls: NoVideoControls,
+              fill: Colors.black,
+              subtitleViewConfiguration: SubtitleViewConfiguration(visible: false),
+            ),
           ),
           // altyazı
           if (cue != null)
@@ -1061,7 +945,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               },
                               onChanged: (v) => setState(() => dragV = v),
                               onChangeEnd: (v) {
-                                vc?.seekTo(Duration(milliseconds: (v * 1000).round()));
+                                player.seek(Duration(milliseconds: (v * 1000).round()));
                                 setState(() => dragging = false);
                                 _armHide();
                               },
@@ -1084,7 +968,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             bottom: ui ? 96 : 34,
             child: Row(children: [
               if (seg != null && !(showNext && seg.type == 'Outro'))
-                _pill(seg.type == 'Intro' ? 'Girişi atla' : 'Jeneriği atla', () => vc?.seekTo(seg.b)),
+                _pill(seg.type == 'Intro' ? 'Girişi atla' : 'Jeneriği atla', () => player.seek(seg.b)),
               if (showNext) ...[
                 const SizedBox(width: 10),
                 _pill('Sonraki bölüm  ›', () => _start(nextEp!, restart: true), primary: true),

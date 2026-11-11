@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'api.dart';
 import 'home.dart';
@@ -12,6 +13,7 @@ import 'widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   await Api.I.init();
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
   final v = WidgetsBinding.instance.platformDispatcher.views.first;
