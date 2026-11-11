@@ -9,7 +9,8 @@ import 'widgets.dart';
 
 class DetailScreen extends StatefulWidget {
   final String id;
-  const DetailScreen({super.key, required this.id});
+  final num? season; // açılışta seçili olacak sezon
+  const DetailScreen({super.key, required this.id, this.season});
   @override
   State<DetailScreen> createState() => _DetailScreenState();
 }
@@ -74,7 +75,7 @@ class _DetailScreenState extends State<DetailScreen> {
         pit = p;
         similar = r[1];
         extras = [...r[2], ...r[3]];
-        season ??= (p['ParentIndexNumber'] as num?) ?? (e.isNotEmpty ? e.first['ParentIndexNumber'] as num? : null);
+        season ??= widget.season ?? (p['ParentIndexNumber'] as num?) ?? (e.isNotEmpty ? e.first['ParentIndexNumber'] as num? : null);
         if (tab.isEmpty) tab = e.isNotEmpty ? 'eps' : 'sim';
         err = '';
       });

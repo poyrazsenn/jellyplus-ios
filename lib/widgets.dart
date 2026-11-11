@@ -92,11 +92,14 @@ class WideCard extends StatelessWidget {
     final w = wideImg(item);
     final ep = item['Type'] == 'Episode';
     final s = item['ParentIndexNumber'], e = item['IndexNumber'];
+    final season = item['Type'] == 'Season';
     final name = ep
         ? '${item['SeriesName'] != null ? '${item['SeriesName']} · ' : ''}${s != null && e != null ? 'S$s:B$e ' : ''}${item['Name'] ?? ''}'
-        : '${item['Name'] ?? ''}';
+        : season && item['SeriesName'] != null
+            ? '${item['SeriesName']} · ${item['Name'] ?? ''}'
+            : '${item['Name'] ?? ''}';
     final lg = (!w.art && !ep && !text) ? logoUrl(item, w: 360) : null;
-    final showT = text || ep || (!w.art && lg == null);
+    final showT = text || ep || season || (!w.art && lg == null);
     final p = ((item['UserData']?['PlayedPercentage']) as num?)?.toDouble() ?? 0;
     final ds = descs(item);
     Widget title() => Text(name,
