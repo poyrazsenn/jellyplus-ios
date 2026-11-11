@@ -221,7 +221,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final id = '${it!['Id']}', msId = '${ms!['Id']}';
     transcode = compat || forceHls || burn || audioIdx != defAudio || !_canDirect();
     final vcodecs = (compat || _dovi) ? 'h264' : 'h264,hevc';
-    final q = 'MediaSourceId=$msId&DeviceId=${api.deviceId}&api_key=${api.token}&PlaySessionId=$sid';
+    final q = 'MediaSourceId=$msId&DeviceId=${api.deviceId}&ApiKey=${api.token}&PlaySessionId=$sid';
     final prof = hlsTry == 0
         ? 'VideoCodec=$vcodecs&AudioCodec=aac,ac3,eac3&TranscodingMaxAudioChannels=6&SegmentContainer=mp4'
             '&MaxStreamingBitrate=40000000&VideoBitrate=40000000&AudioBitrate=384000'
@@ -460,7 +460,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     try {
       final txt = await api.getText(
-          '${api.url}/Videos/$id/${ms!['Id']}/Subtitles/$idx/0/Stream.vtt?api_key=${api.token}');
+          '${api.url}/Videos/$id/${ms!['Id']}/Subtitles/$idx/0/Stream.vtt');
       if (!mounted || it?['Id'] != id || subIdx != idx) return;
       setState(() => cues = _parseVtt(txt));
     } catch (_) {
