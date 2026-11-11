@@ -1,0 +1,4 @@
+# flutter_lints kullanılmıyor; Flutter'ın varsayılan kuralları yeterli.
+analyzer:
+  errors:
+    deprecated_member_use: ignore
