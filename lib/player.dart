@@ -101,6 +101,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? hideT, repT, ageT;
   Offset tapAt = Offset.zero;
   double speed = 1;
+  int hlsTry = 0; // 0: fMP4 + 6 kanal, 1: klasik TS + stereo AAC (web istemcisinin ayarı)
   bool compat = Api.I.compat; // uyumlu mod: videoyu sunucu H.264'e çevirir
   Timer? vidT;
 
@@ -149,6 +150,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       dur = Duration.zero;
       forceHls = false;
       burn = false;
+      hlsTry = 0;
     });
     J full;
     try {
@@ -220,10 +222,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     transcode = compat || forceHls || burn || audioIdx != defAudio || !_canDirect();
     final vcodecs = (compat || _dovi) ? 'h264' : 'h264,hevc';
     final q = 'MediaSourceId=$msId&DeviceId=${api.deviceId}&api_key=${api.token}&PlaySessionId=$sid';
-    final url = transcode
-        ? '${api.url}/Videos/$id/master.m3u8?$q&VideoCodec=$vcodecs&AudioCodec=aac,ac3,eac3'
-            '&TranscodingMaxAudioChannels=6&SegmentContainer=mp4&MinSegments=1&BreakOnNonKeyFrames=True'
+    final prof = hlsTry == 0
+        ? 'VideoCodec=$vcodecs&AudioCodec=aac,ac3,eac3&TranscodingMaxAudioChannels=6&SegmentContainer=mp4'
             '&MaxStreamingBitrate=40000000&VideoBitrate=40000000&AudioBitrate=384000'
+        : 'VideoCodec=h264&AudioCodec=aac&TranscodingMaxAudioChannels=2&SegmentContainer=ts'
+            '&MaxStreamingBitrate=20000000&VideoBitrate=20000000&AudioBitrate=192000';
+    final url = transcode
+        ? '${api.url}/Videos/$id/master.m3u8?$q&$prof&MinSegments=1&BreakOnNonKeyFrames=True'
             '${audioIdx != null ? '&AudioStreamIndex=$audioIdx' : ''}'
             '${burn && subIdx != null ? '&SubtitleStreamIndex=$subIdx&SubtitleMethod=Encode' : ''}'
         : '${api.url}/Videos/$id/stream.mp4?static=true&$q';
@@ -244,7 +249,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
         forceHls = true; // doğrudan oynatma olmadı → sunucu dönüştürsün
         return _open(startAt);
       }
-      if (mounted) setState(() => err = 'Video açılamadı. Sunucu bu dosyayı dönüştüremiyor olabilir.');
+      if (hlsTry == 0) {
+        hlsTry = 1; // klasik ayarlarla bir kez daha dene
+        _killEncoding();
+        sid = _newSid();
+        return _open(startAt);
+      }
+      final why = await _probe(url);
+      if (mounted) {
+        setState(() => err = 'Video açılamadı.\n\n$why\n\nOynatıcı hatası: ${e is PlatformException ? (e.message ?? e.code) : e}\n\n${_info()}');
+      }
       return;
     }
     opening = false;
@@ -258,6 +272,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     repT?.cancel();
     repT = Timer.periodic(const Duration(seconds: 10), (_) => _report('/Progress'));
     _armHide();
+  }
+
+  void _killEncoding() {
+    api.delete('/Videos/ActiveEncodings?DeviceId=${api.deviceId}&PlaySessionId=$sid').catchError((_) {});
+  }
+
+  /// Sunucunun akış adresine verdiği cevabı oku (hatanın nedenini göstermek için)
+  Future<String> _probe(String url) async {
+    try {
+      final t = await api.getText(url);
+      return t.contains('#EXTM3U') ? 'Sunucu akışı oluşturdu ama iPhone oynatamadı.' : 'Sunucu beklenmeyen cevap verdi.';
+    } catch (e) {
+      if (e is ApiError) {
+        if (e.code == 401 || e.code == 403) return 'Sunucu dönüştürmeye izin vermiyor ($e). Jellyfin kullanıcı ayarlarında "dönüştürme gerektiren oynatmaya izin ver" açık mı?';
+        return 'Sunucu dönüştürmeyi başlatamadı ($e). Jellyfin → Pano → Günlükler bölümündeki en yeni FFmpeg.Transcode günlüğü nedenini gösterir.';
+      }
+      return 'Sunucuya ulaşılamadı: $e';
+    }
   }
 
   /// Ses/altyazı ilerliyor ama görüntü gelmiyorsa uyumlu moda geç
@@ -342,7 +374,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _open(v.position);
         return;
       }
-      setState(() => err = 'Oynatma hatası: ${v.errorDescription ?? ''}');
+      if (hlsTry == 0) {
+        hlsTry = 1;
+        _killEncoding();
+        sid = _newSid();
+        _open(v.position);
+        return;
+      }
+      setState(() => err = 'Oynatma hatası: ${v.errorDescription ?? ''}\n\n${_info()}');
       return;
     }
     final was = playing;
@@ -853,7 +892,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               alignment: Alignment.center,
               padding: const EdgeInsets.all(30),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(err, textAlign: TextAlign.center),
+                Flexible(child: SingleChildScrollView(child: SelectableText(err, textAlign: TextAlign.center))),
                 const SizedBox(height: 18),
                 FilledButton(onPressed: _close, child: const Text('Kapat')),
               ]),
