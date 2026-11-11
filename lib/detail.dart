@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
 import 'nav.dart';
+import 'theme_music.dart';
 import 'util.dart';
 import 'widgets.dart';
 
@@ -24,6 +25,7 @@ class _DetailScreenState extends State<DetailScreen> {
   String tab = '';
   String err = '';
   bool moreText = false;
+  bool hasTheme = false, themeTried = false;
 
   @override
   void initState() {
@@ -35,6 +37,7 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   void dispose() {
     refreshBus.removeListener(_soft);
+    ThemeMusic.I.stop(ifOwner: widget.id);
     super.dispose();
   }
 
@@ -79,6 +82,12 @@ class _DetailScreenState extends State<DetailScreen> {
         if (tab.isEmpty) tab = e.isNotEmpty ? 'eps' : 'sim';
         err = '';
       });
+      if (!themeTried) {
+        themeTried = true;
+        ThemeMusic.I.start(widget.id).then((has) {
+          if (mounted) setState(() => hasTheme = has);
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => err = 'Yüklenemedi.\n$e');
     }
@@ -185,6 +194,22 @@ class _DetailScreenState extends State<DetailScreen> {
                       onPressed: () => Navigator.of(context).maybePop()),
                 ),
               ),
+              if (hasTheme)
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 6,
+                  right: 10,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    child: IconButton(
+                      tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç',
+                      icon: Icon(api.themeOn ? Icons.volume_up : Icons.volume_off, color: Colors.white),
+                      onPressed: () {
+                        setState(() => api.themeOn = !api.themeOn);
+                        api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
+                      },
+                    ),
+                  ),
+                ),
               Positioned(
                 left: pad,
                 right: pad,

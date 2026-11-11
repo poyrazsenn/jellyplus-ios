@@ -98,7 +98,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   double dragV = 0;
   Duration pos = Duration.zero, dur = Duration.zero;
   bool playing = false, buffering = true;
-  Timer? hideT, repT, ageT;
+  Timer? hideT, repT, ageT, subT;
+  Duration subDelay = Duration.zero; // + geç, − erken
+  DateTime posAt = DateTime.now();
+  String? shownCue;
   Offset tapAt = Offset.zero;
   double speed = 1;
   int hlsTry = 0; // 0: fMP4 + 6 kanal, 1: klasik TS + stereo AAC (web istemcisinin ayarı)
@@ -114,6 +117,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
+    // Altyazıyı oynatıcının 0,5 sn'lik konum güncellemesini beklemeden, 100 ms'de bir eşle
+    subT = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted) return;
+      final t = _cueAt(_subPos);
+      if (t != shownCue) setState(() => shownCue = t);
+    });
     _start(widget.item, restart: widget.restart);
   }
 
@@ -123,6 +132,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     repT?.cancel();
     ageT?.cancel();
     vidT?.cancel();
+    subT?.cancel();
     if (!closed) _stopCurrent();
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -385,6 +395,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return;
     }
     final was = playing;
+    if (v.position != pos) posAt = DateTime.now();
     pos = v.position;
     dur = v.duration;
     playing = v.isPlaying;
@@ -411,7 +422,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return null;
   }
 
-  String? get _cue {
+  /// Son bilinen konum + o andan beri geçen süre (oynarken)
+  Duration get _subPos {
+    var p = pos;
+    if (playing) {
+      final e = DateTime.now().difference(posAt);
+      if (e < const Duration(seconds: 2)) p += e * speed;
+    }
+    return p - subDelay;
+  }
+
+  String? _cueAt(Duration pos) {
     if (cues.isEmpty || subIdx == null || burn) return null;
     // ikili arama
     var lo = 0, hi = cues.length - 1, f = -1;
@@ -636,6 +657,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   Navigator.pop(c);
                   _selectSub((s['Index'] as num).toInt());
                 }, sub: s['IsTextSubtitleStream'] == true ? null : 'Resim altyazı — sunucu videoya gömer'),
+              StatefulBuilder(builder: (c2, set2) {
+                final ms = subDelay.inMilliseconds;
+                final lab = ms == 0 ? '0 sn' : '${ms > 0 ? '+' : ''}${(ms / 1000).toStringAsFixed(2)} sn';
+                void adj(int d) => set2(() => subDelay += Duration(milliseconds: d));
+                return ListTile(
+                  dense: true,
+                  title: const Text('Altyazı zamanlaması'),
+                  subtitle: Text('$lab   (+ geç, − erken gösterir)', style: const TextStyle(color: kMuted, fontSize: 11)),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => adj(-250)),
+                    IconButton(icon: const Icon(Icons.restart_alt), onPressed: () => set2(() => subDelay = Duration.zero)),
+                    IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => adj(250)),
+                  ]),
+                );
+              }),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.download_outlined),
+                title: const Text('Altyazı ara ve indir'),
+                subtitle: const Text('Subtitle Downloader eklentisi', style: TextStyle(color: kMuted, fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(c);
+                  _subSearch();
+                },
+              ),
               head('GÖRÜNTÜ'),
               SwitchListTile(
                 dense: true,
@@ -670,6 +716,165 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ]),
       ),
     );
+    _armHide();
+  }
+
+  static const _langs = {
+    'tr': 'Türkçe', 'en': 'English', 'fa': 'Farsça', 'ar': 'Arapça', 'de': 'Almanca', 'fr': 'Fransızca',
+    'es': 'İspanyolca', 'it': 'İtalyanca', 'pt': 'Portekizce', 'ru': 'Rusça', 'all': 'Tüm diller',
+  };
+
+  /// Subtitle Downloader eklentisi (web istemcisiyle aynı uçlar)
+  Future<void> _subSearch() async {
+    hideT?.cancel();
+    final id = '${it?['Id']}';
+    var lang = _langs.containsKey(api.subLang) ? api.subLang : 'tr';
+    final q = TextEditingController();
+    var res = <J>[];
+    var msg = 'Aranıyor…';
+    var started = false;
+    String? loadingId;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xF20B1024),
+      constraints: BoxConstraints(maxWidth: 760, maxHeight: MediaQuery.sizeOf(context).height * .92),
+      builder: (c) => StatefulBuilder(builder: (c, set) {
+        Future<void> search() async {
+          set(() {
+            msg = 'Aranıyor…';
+            res = [];
+          });
+          try {
+            final r = await api.get(
+                '/SubtitleDownloader/Search?itemId=$id&language=$lang&query=${Uri.encodeQueryComponent(q.text.trim())}');
+            final l = ((r?['results'] as List?) ?? const []).map((e) => J.from(e as Map)).toList();
+            int b(dynamic x) => x == true ? 1 : 0;
+            l.sort((x, y) {
+              final h = b(y['IsHashMatch']) - b(x['IsHashMatch']);
+              return h != 0 ? h : b(y['IsReleaseMatch']) - b(x['IsReleaseMatch']);
+            });
+            if (!c.mounted) return;
+            set(() {
+              res = l.take(50).toList();
+              msg = l.isEmpty ? 'Bu dil için sonuç yok. Başka bir dil ya da başlık dene.' : '';
+            });
+          } catch (e) {
+            if (!c.mounted) return;
+            set(() => msg = e is ApiError && e.code == 404
+                ? 'Subtitle Downloader eklentisi sunucuda bulunamadı. Eklentiyi kurup sunucuyu yeniden başlat.'
+                : 'Altyazı aranamadı ($e).');
+          }
+        }
+
+        Future<void> download(J x) async {
+          set(() => loadingId = '${x['Id']}');
+          try {
+            final r = await api.post('/SubtitleDownloader/Download', {
+              'ItemId': id,
+              'SubtitleId': x['Id'],
+              'Provider': x['Provider'],
+              'Format': x['Format'] ?? 'srt',
+              'Language': x['Language'] ?? lang,
+              'DownloadUrl': x['DownloadUrl'],
+              'FileId': x['FileId'],
+            });
+            if (r?['Success'] != true) throw Exception(r?['Message'] ?? 'indirilemedi');
+            // yeni altyazı akışını görmek için öğeyi tazele (oynatmayı kesmeden)
+            final full = await api.item(id);
+            final srcs = (full['MediaSources'] as List?) ?? const [];
+            if (mounted && srcs.isNotEmpty) {
+              setState(() {
+                it = full;
+                ms = J.from(srcs.first as Map);
+              });
+            }
+            if (c.mounted) Navigator.pop(c);
+            final idx = (r['StreamIndex'] as num?)?.toInt();
+            if (idx != null) await _selectSub(idx);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Altyazı indirildi ve açıldı.'), duration: Duration(seconds: 2)));
+            }
+          } catch (e) {
+            if (c.mounted) {
+              set(() {
+                loadingId = null;
+                msg = 'İndirilemedi: $e';
+              });
+            }
+          }
+        }
+
+        if (!started) {
+          started = true;
+          Future.microtask(search);
+        }
+        const muted = TextStyle(color: kMuted, fontSize: 12);
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(c).bottom),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                const Text('Altyazı ara', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                const Spacer(),
+                DropdownButton<String>(
+                  value: lang,
+                  dropdownColor: const Color(0xFF151B3A),
+                  underline: const SizedBox.shrink(),
+                  items: [for (final e in _langs.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    lang = v;
+                    search();
+                  },
+                ),
+              ]),
+              const SizedBox(height: 6),
+              TextField(
+                controller: q,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => search(),
+                decoration: InputDecoration(
+                  hintText: 'Başlık (boş bırak: otomatik bulur)',
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white10,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: search),
+                ),
+              ),
+              if (msg.isNotEmpty) Padding(padding: const EdgeInsets.all(14), child: Text(msg, style: muted)),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: res.length,
+                  itemBuilder: (_, i) {
+                    final x = res[i];
+                    final tags = <String?>[
+                      x['IsHashMatch'] == true
+                          ? '⭐ Tam senkron'
+                          : (x['IsReleaseMatch'] == true ? '🎯 Sürüm eşleşti' : null),
+                      '${x['Provider'] ?? ''}',
+                      '${x['LanguageName'] ?? x['Language'] ?? ''}',
+                      if (x['HearingImpaired'] == true) 'İşitme engelli',
+                      if (x['DownloadCount'] != null) '${x['DownloadCount']} indirme',
+                    ].whereType<String>().where((s) => s.isNotEmpty).join(' • ');
+                    return ListTile(
+                      dense: true,
+                      enabled: loadingId == null,
+                      title: Text('${x['ReleaseName'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(loadingId == '${x['Id']}' ? 'İndiriliyor…' : tags, style: muted),
+                      onTap: () => download(x),
+                    );
+                  },
+                ),
+              ),
+            ]),
+          ),
+        );
+      }),
+    );
+    q.dispose();
     _armHide();
   }
 
@@ -733,7 +938,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final sub = i != null && i['Type'] == 'Episode'
         ? 'S${i['ParentIndexNumber'] ?? '?'}:B${i['IndexNumber'] ?? '?'}  ${i['Name'] ?? ''}'
         : '';
-    final cue = _cue;
+    final cue = shownCue;
     final maxV = max(1.0, dur.inMilliseconds / 1000.0);
     final curV = dragging ? dragV : min(maxV, pos.inMilliseconds / 1000.0);
 

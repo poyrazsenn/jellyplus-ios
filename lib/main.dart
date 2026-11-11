@@ -6,6 +6,7 @@ import 'api.dart';
 import 'home.dart';
 import 'library.dart';
 import 'search.dart';
+import 'theme_music.dart';
 import 'util.dart';
 import 'widgets.dart';
 
@@ -314,6 +315,7 @@ class _ShellState extends State<Shell> {
               if (i == tab) {
                 keys[i].currentState?.popUntil((r) => r.isFirst);
               } else {
+                ThemeMusic.I.stop();
                 setState(() => tab = i);
               }
             },

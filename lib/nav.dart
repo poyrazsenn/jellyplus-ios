@@ -4,6 +4,7 @@ import 'api.dart';
 import 'detail.dart';
 import 'library.dart';
 import 'player.dart';
+import 'theme_music.dart';
 
 /// Kart/vitrin tıklaması: bölümse dizisine, koleksiyonsa içeriğine, değilse detaya git.
 Future<void> openItem(BuildContext c, J it) async {
@@ -30,6 +31,7 @@ Future<void> openPlayer(BuildContext c, J it, {bool restart = false}) async {
     await openItem(c, it);
     return;
   }
+  ThemeMusic.I.stop(hard: true);
   await Navigator.of(c, rootNavigator: true).push(MaterialPageRoute(
       fullscreenDialog: true, builder: (_) => PlayerScreen(item: it, restart: restart)));
   refreshBus.value++;

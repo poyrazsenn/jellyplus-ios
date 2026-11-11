@@ -201,6 +201,8 @@ class Api {
   set subLang(String v) => prefs.setString('psub', v);
   bool get autoSkip => prefs.getBool('auto') ?? false;
   set autoSkip(bool v) => prefs.setBool('auto', v);
+  bool get themeOn => prefs.getBool('theme') ?? true;
+  set themeOn(bool v) => prefs.setBool('theme', v);
   bool get compat => prefs.getBool('compat') ?? false;
   set compat(bool v) => prefs.setBool('compat', v);
   double get subSize => prefs.getDouble('subsize') ?? 1.0;
