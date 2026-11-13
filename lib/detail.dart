@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
+import 'downloads.dart';
+import 'downloads_screen.dart';
 import 'nav.dart';
 import 'theme_music.dart';
 import 'util.dart';
@@ -32,11 +34,17 @@ class _DetailScreenState extends State<DetailScreen> {
     super.initState();
     load();
     refreshBus.addListener(_soft);
+    Downloads.I.addListener(_dl);
+  }
+
+  void _dl() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     refreshBus.removeListener(_soft);
+    Downloads.I.removeListener(_dl);
     ThemeMusic.I.stop(ifOwner: widget.id);
     super.dispose();
   }
@@ -277,6 +285,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 _act(Icons.movie_creation_outlined, 'Fragman',
                     () => launchUrl(Uri.parse(tr), mode: LaunchMode.externalApplication)),
               if (res) _act(Icons.replay, 'Baştan', () => openPlayer(context, p, restart: true)),
+              if (!isSeries && (x['MediaSources'] as List?)?.isNotEmpty == true) _dlAct(x),
               _act(seen ? Icons.visibility : Icons.visibility_outlined, seen ? 'İzlendi' : 'İzlenmedi',
                   () => flag('seen', !seen)),
             ]),
@@ -334,18 +343,33 @@ class _DetailScreenState extends State<DetailScreen> {
             style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, shadows: [Shadow(blurRadius: 14)])),
       );
 
-  Widget _act(IconData i, String label, VoidCallback onTap) => InkWell(
+  Widget _dlAct(J v) {
+    final b = dlButton('${v['Id']}');
+    final d = Downloads.I.of('${v['Id']}');
+    return _act(b.icon, b.label, () => d == null ? askDownload(context, [v]) : dlActions(context, d), frac: b.frac);
+  }
+
+  Widget _act(IconData i, String label, VoidCallback onTap, {double? frac}) => InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
+            SizedBox(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle, color: Colors.black54, border: Border.all(color: Colors.white, width: 2)),
-              child: Icon(i, size: 22),
+              child: Stack(alignment: Alignment.center, children: [
+                Container(
+                  decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black54,
+                      border: Border.all(color: frac != null ? Colors.white24 : Colors.white, width: 2)),
+                  child: Center(child: Icon(i, size: 22)),
+                ),
+                if (frac != null)
+                  SizedBox.expand(
+                      child: CircularProgressIndicator(value: frac == 0 ? null : frac, strokeWidth: 2.5, color: kBlue)),
+              ]),
             ),
             const SizedBox(height: 5),
             Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFFCFD5EA))),
@@ -396,6 +420,27 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
               ),
             ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(pad, 6, pad, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.download_outlined, size: 20),
+                  label: Text(season == null || season == 0 ? 'Özel bölümleri indir' : '$season. sezonu indir'),
+                  onPressed: () {
+                    final todo = list.where((e) => Downloads.I.of('${e['Id']}') == null).toList();
+                    if (todo.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Bu sezonun bölümleri zaten indirildi ya da sırada.')));
+                      return;
+                    }
+                    askDownload(context, todo, title: '${todo.length} bölümü indir');
+                  },
+                ),
+              ),
+            ),
+          ),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(pad, 8, pad, 0),
             sliver: SliverList.separated(
@@ -457,6 +502,31 @@ class _DetailScreenState extends State<DetailScreen> {
             Text('${e['Overview'] ?? ''}',
                 maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFCFD5EA), height: 1.4)),
           ]),
+        ),
+        _epDl(c, e),
+      ]),
+    );
+  }
+
+  Widget _epDl(BuildContext c, J e) {
+    final d = Downloads.I.of('${e['Id']}');
+    final b = dlButton('${e['Id']}');
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Stack(alignment: Alignment.center, children: [
+        if (b.frac != null)
+          SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(value: b.frac == 0 ? null : b.frac, strokeWidth: 2, color: kBlue)),
+        IconButton(
+          padding: EdgeInsets.zero,
+          iconSize: b.frac != null ? 14 : 22,
+          tooltip: b.label,
+          icon: Icon(b.frac != null ? Icons.stop_rounded : b.icon,
+              color: d?.state == DlState.done ? kBlue : Colors.white70),
+          onPressed: () => d == null ? askDownload(c, [e]) : dlActions(c, d),
         ),
       ]),
     );

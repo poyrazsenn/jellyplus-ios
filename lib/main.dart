@@ -4,17 +4,26 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'api.dart';
+import 'downloads.dart';
+import 'downloads_screen.dart';
 import 'home.dart';
 import 'library.dart';
+import 'player.dart' show subtitleText;
 import 'search.dart';
+import 'seerr.dart';
 import 'theme_music.dart';
+import 'update.dart';
 import 'util.dart';
+import 'version.dart';
 import 'widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   await Api.I.init();
+  try {
+    await Downloads.I.init();
+  } catch (_) {}
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
   final v = WidgetsBinding.instance.platformDispatcher.views.first;
   isTablet = v.physicalSize.shortestSide / v.devicePixelRatio > 600;
@@ -268,19 +277,52 @@ class Shell extends StatefulWidget {
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> {
+class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int tab = 0;
-  final keys = List.generate(4, (_) => GlobalKey<NavigatorState>());
+  static const dlTab = 3;
+  final keys = List.generate(5, (_) => GlobalKey<NavigatorState>());
 
   @override
   void initState() {
     super.initState();
-    Api.I.loadMe().catchError((e) {
-      if (e is ApiError && e.code == 401 && mounted) {
+    WidgetsBinding.instance.addObserver(this);
+    Api.I.loadMe().then((_) {
+      _online();
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await showWhatsNew(context);
+        if (mounted) await checkUpdate(context);
+      });
+    }).catchError((e) {
+      if (!mounted) return;
+      if (e is ApiError && e.code == 401) {
         Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => LoginScreen(server: Api.I.url, user: Api.I.name)), (_) => false);
+      } else if (e is! ApiError && Downloads.I.hasDone) {
+        // sunucuya ulaşılamıyor: indirilenlerle devam
+        setState(() => tab = dlTab);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Sunucuya ulaşılamadı. İndirdiklerini izleyebilirsin.'), duration: Duration(seconds: 4)));
       }
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Sunucuya ulaşılınca: bekleyen çevrimdışı ilerlemeyi yaz, yarım indirmeleri sürdür.
+  void _online() {
+    Downloads.I.sync();
+    Downloads.I.retryFailed();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.resumed) _online();
   }
 
   Widget tabNav(int i, Widget root) => Navigator(
@@ -301,7 +343,8 @@ class _ShellState extends State<Shell> {
           tabNav(0, const HomeScreen()),
           tabNav(1, const SearchScreen()),
           tabNav(2, const LibraryScreen(title: 'Listem', extra: '&IsFavorite=true', root: true)),
-          tabNav(3, const SettingsScreen()),
+          tabNav(3, const DownloadsScreen()),
+          tabNav(4, const SettingsScreen()),
         ]),
         bottomNavigationBar: Theme(
           data: Theme.of(context).copyWith(splashColor: Colors.transparent, highlightColor: Colors.transparent),
@@ -325,6 +368,10 @@ class _ShellState extends State<Shell> {
               BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Ana sayfa'),
               BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Ara'),
               BottomNavigationBarItem(icon: Icon(Icons.add), activeIcon: Icon(Icons.check), label: 'Listem'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.download_for_offline_outlined),
+                  activeIcon: Icon(Icons.download_for_offline),
+                  label: 'İndirilenler'),
               BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
             ],
           ),
@@ -382,6 +429,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (v != null) setState(() => api.subLang = v);
   }
 
+  Widget _head(String t) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
+        child: Text(t, style: const TextStyle(color: kMuted, fontSize: 12, letterSpacing: 1.4)),
+      );
+
+  Widget _choice(String label, List<String> opts, int cur, void Function(int) set) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+        child: Row(children: [
+          SizedBox(width: 78, child: Text(label)),
+          Expanded(
+            child: Wrap(spacing: 6, runSpacing: 4, children: [
+              for (var i = 0; i < opts.length; i++)
+                ChoiceChip(
+                  label: Text(opts[i], style: const TextStyle(fontSize: 12)),
+                  selected: cur == i,
+                  onSelected: (_) => setState(() => set(i)),
+                ),
+            ]),
+          ),
+        ]),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -431,6 +500,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: api.autoSkip,
           onChanged: (v) => setState(() => api.autoSkip = v),
         ),
+        SwitchListTile(
+          secondary: const Icon(Icons.skip_next_outlined),
+          title: const Text('Sonraki bölümü otomatik başlat'),
+          subtitle: const Text('Jenerikte 10 saniyelik geri sayım', style: TextStyle(color: kMuted)),
+          value: api.autoNext,
+          onChanged: (v) => setState(() => api.autoNext = v),
+        ),
+        _head('ALTYAZI GÖRÜNÜMÜ'),
+        Container(
+          height: 90,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          alignment: Alignment(0, [0.75, 0.25, -0.25][api.subLift.clamp(0, 2)]),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            gradient: const LinearGradient(colors: [Color(0xFF2A3B5C), Color(0xFF6B7C93), Color(0xFF34404F)]),
+          ),
+          child: subtitleText('Altyazı böyle görünecek', scale: .75),
+        ),
+        _choice('Renk', ['Beyaz', 'Sarı'], api.subColor, (v) => api.subColor = v),
+        _choice('Arka plan', ['Gölge', 'Yarı saydam', 'Siyah kutu'], api.subBg, (v) => api.subBg = v),
+        _choice('Konum', ['Alt', 'Biraz yukarı', 'Yukarı'], api.subLift, (v) => api.subLift = v),
+        _head('İNDİRMELER'),
+        SwitchListTile(
+          secondary: const Icon(Icons.auto_delete_outlined),
+          title: const Text('İzleyince sil'),
+          subtitle: const Text('İzlenen indirmeler oynatıcı kapanınca silinir', style: TextStyle(color: kMuted)),
+          value: Downloads.I.autoDelete,
+          onChanged: (v) => setState(() => Downloads.I.autoDelete = v),
+        ),
+        _head('İSTEKLER (SEERR)'),
+        if (Seerr.I.on)
+          ListTile(
+            leading: const Icon(Icons.playlist_add_check),
+            title: const Text('İsteklerim'),
+            subtitle: const Text('Bekliyor / indiriliyor / hazır', style: TextStyle(color: kMuted)),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RequestsScreen())),
+          ),
+        ListTile(
+          leading: const Icon(Icons.link),
+          title: const Text('Seerr bağlantısı'),
+          subtitle: Text(Seerr.I.on ? Seerr.I.url : 'Bağlı değil', style: const TextStyle(color: kMuted)),
+          onTap: () async {
+            await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SeerrSettingsScreen()));
+            if (mounted) setState(() {});
+          },
+        ),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.new_releases_outlined),
+          title: const Text('Bu sürümdeki yenilikler'),
+          onTap: () => showWhatsNew(context, force: true),
+        ),
         const Divider(),
         ListTile(
           leading: const Icon(Icons.logout, color: Color(0xFFFF8A8A)),
@@ -441,7 +562,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           },
         ),
         const SizedBox(height: 20),
-        const Center(child: Text('Jelly+ iOS 1.0', style: TextStyle(color: kMuted, fontSize: 12))),
+        const Center(child: Text('Jelly+ iOS $kVersion', style: TextStyle(color: kMuted, fontSize: 12))),
         const SizedBox(height: 30),
       ]),
     );

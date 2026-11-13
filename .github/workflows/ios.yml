@@ -3,7 +3,11 @@ name: iOS IPA derle
 on:
   workflow_dispatch: {}
   push:
-    branches: [main]
+    branches: [main, v2]
+    tags: ['v*']
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -72,3 +76,12 @@ jobs:
           name: JellyPlus-ipa
           path: JellyPlus.ipa
           retention-days: 30
+
+      - name: GitHub sürümü (etiketle; '-' içeren etiket ön sürüm olur)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Jelly+ ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body_path: RELEASE_NOTES.md
+          files: JellyPlus.ipa

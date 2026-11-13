@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'version.dart';
+
 typedef J = Map<String, dynamic>;
 
 /// Oynatıcı kapanınca ana sayfa / detay sayfası kendini yenilesin diye.
@@ -101,7 +103,7 @@ class Api {
 
   // ---------- HTTP ----------
   String get _auth =>
-      'MediaBrowser Client="Jelly+ iOS", Device="iPhone", DeviceId="$deviceId", Version="1.0.0"'
+      'MediaBrowser Client="Jelly+ iOS", Device="iPhone", DeviceId="$deviceId", Version="$kVersion"'
       '${token.isNotEmpty ? ', Token="$token"' : ''}';
 
   Map<String, String> get headers =>
@@ -207,6 +209,17 @@ class Api {
   set compat(bool v) => prefs.setBool('compat', v);
   double get subSize => prefs.getDouble('subsize') ?? 1.0;
   set subSize(double v) => prefs.setDouble('subsize', v);
+  /// 0 beyaz, 1 sarı
+  int get subColor => prefs.getInt('subcolor') ?? 0;
+  set subColor(int v) => prefs.setInt('subcolor', v);
+  /// 0 gölge, 1 yarı saydam kutu, 2 siyah kutu
+  int get subBg => prefs.getInt('subbg') ?? 0;
+  set subBg(int v) => prefs.setInt('subbg', v);
+  /// 0 alt, 1 biraz yukarı, 2 yukarı
+  int get subLift => prefs.getInt('sublift') ?? 0;
+  set subLift(int v) => prefs.setInt('sublift', v);
+  bool get autoNext => prefs.getBool('autonext') ?? true;
+  set autoNext(bool v) => prefs.setBool('autonext', v);
 
   // ---------- görseller ----------
   String image(String id, String type, {String? tag, int w = 640}) =>

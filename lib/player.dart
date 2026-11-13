@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
@@ -8,6 +9,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'api.dart';
+import 'downloads.dart';
 import 'main.dart' show allowAppOrientations;
 import 'util.dart';
 import 'widgets.dart';
@@ -50,6 +52,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   final List<StreamSubscription> subs = [];
 
   J? it, ms;
+  Dl? loc; // indirilmiş dosyadan oynatılıyorsa
+  J? tp; // trickplay bilgisi
+  String tpW = '';
+  Timer? cdT; // sonraki bölüm geri sayımı
+  int cd = 0;
+  String? cdOff; // geri sayımı iptal edilen bölüm
   String sid = '';
   bool transcode = false, burn = false, closed = false, ready = false;
   int? audioIdx, subIdx, defAudio;
@@ -117,12 +125,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
     hideT?.cancel();
     repT?.cancel();
     ageT?.cancel();
+    cdT?.cancel();
     for (final s in subs) {
       s.cancel();
     }
     if (!closed) _stopCurrent();
     player.dispose();
     WakelockPlus.disable();
+    Downloads.I.cleanupWatched();
+    Downloads.I.sync();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     allowAppOrientations();
     super.dispose();
@@ -136,6 +147,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       s.done = true;
       player.seek(s.b);
     }
+    _checkCountdown(s);
     // ekranı en fazla ~4 kez/sn yenile
     if (dragging) return;
     if ((pos - painted).abs() >= const Duration(milliseconds: 250) || pos < painted) {
@@ -153,7 +165,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _start(J base, {bool restart = false}) async {
     await _stopCurrent();
     if (!mounted) return;
+    cdT?.cancel();
+    cdT = null;
     setState(() {
+      tp = null;
       err = '';
       ended = false;
       segs = [];
@@ -165,10 +180,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
       shownCue = null;
     });
     J full;
-    try {
-      full = await api.item('${base['Id']}');
-    } catch (_) {
-      full = base;
+    final id0 = '${base['Id']}';
+    loc = Downloads.I.doneFor(id0);
+    if (loc != null) {
+      // indirilmiş dosya: sunucuya hiç gitmeden oynar; internet varsa sadece kaldığın yeri sor
+      full = Downloads.I.localItem(loc!);
+      try {
+        final srv = await api.item(id0).timeout(const Duration(seconds: 4));
+        if (srv['UserData'] != null) full['UserData'] = srv['UserData'];
+      } catch (_) {}
+    } else {
+      try {
+        full = await api.item(id0);
+      } catch (_) {
+        full = base;
+      }
     }
     if (!mounted) return;
     final sources = (full['MediaSources'] as List?) ?? const [];
@@ -185,6 +211,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     audioIdx = defAudio;
     subIdx = _autoSub();
     final startAt = restart ? Duration.zero : ticks((full['UserData'] as Map?)?['PlaybackPositionTicks'] ?? 0);
+    _setupTrickplay();
     await _open(startAt);
     _loadSegments();
     _loadEpisodes();
@@ -206,14 +233,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _open(Duration startAt) async {
     final tok = ++openTok;
     final id = '${it!['Id']}', msId = '${ms!['Id']}';
-    transcode = burn;
+    transcode = burn && loc == null;
     final q = 'MediaSourceId=$msId&DeviceId=${api.deviceId}&ApiKey=${api.token}&PlaySessionId=$sid';
     final url = transcode
         ? '${api.url}/Videos/$id/master.m3u8?$q&VideoCodec=h264&AudioCodec=aac&TranscodingMaxAudioChannels=2'
             '&SegmentContainer=ts&MinSegments=1&BreakOnNonKeyFrames=True&MaxStreamingBitrate=20000000'
             '${audioIdx != null ? '&AudioStreamIndex=$audioIdx' : ''}'
             '${subIdx != null ? '&SubtitleStreamIndex=$subIdx&SubtitleMethod=Encode' : ''}'
-        : '${api.url}/Videos/$id/stream?static=true&$q';
+        : loc != null
+            ? Downloads.I.path(loc!)
+            : '${api.url}/Videos/$id/stream?static=true&$q';
     ready = false;
     if (mounted) setState(() => buffering = true);
     try {
@@ -272,9 +301,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final s = streams.firstWhere((x) => x['Index'] == subIdx, orElse: () => <String, dynamic>{});
     if (s.isEmpty) return;
     if (s['IsExternal'] == true) {
-      // indirilmiş/yan dosya altyazı: sunucudan al
+      // yan dosya altyazı: indirildiyse telefondan, yoksa sunucudan
       await player.setSubtitleTrack(SubtitleTrack.uri(
-        '${api.url}/Videos/${it!['Id']}/${ms!['Id']}/Subtitles/$subIdx/0/Stream.srt?ApiKey=${api.token}',
+        loc != null
+            ? Downloads.I.subPath(loc!, subIdx!)
+            : '${api.url}/Videos/${it!['Id']}/${ms!['Id']}/Subtitles/$subIdx/0/Stream.srt?ApiKey=${api.token}',
         title: '${s['DisplayTitle'] ?? s['Title'] ?? 'Altyazı'}',
         language: '${s['Language'] ?? ''}',
       ));
@@ -301,13 +332,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (v?['VideoRangeType'] != null) '${v?['VideoRangeType']}',
       if (a.isNotEmpty) 'Ses: ${'${a.first['Codec'] ?? ''}'.toUpperCase()} ${a.first['Channels'] ?? ''}ch',
     ].join(' • ');
-    return 'Kaynak: $src\nOynatma: ${transcode ? 'Sunucu resim altyazıyı videoya gömüyor (HLS)' : 'Doğrudan oynatma (mpv, sunucuda dönüştürme yok)'}'
+    final how = loc != null
+        ? 'İndirilen dosya (${loc!.quality == 'small' ? 'küçük kopya' : 'orijinal'}, internet gerekmez)'
+        : transcode
+            ? 'Sunucu resim altyazıyı videoya gömüyor (HLS)'
+            : 'Doğrudan oynatma (mpv, sunucuda dönüştürme yok)';
+    return 'Kaynak: $src\nOynatma: $how'
         '\nGörüntü: ${player.state.width ?? 0}×${player.state.height ?? 0}';
   }
 
   Future<void> _report(String kind) async {
     final i = it;
     if (i == null || !ready) return;
+    if (loc != null) Downloads.I.progress('${i['Id']}', player.state.position.inMicroseconds * 10);
     final body = <String, dynamic>{
       'ItemId': i['Id'],
       'MediaSourceId': ms?['Id'],
@@ -441,7 +478,119 @@ class _PlayerScreenState extends State<PlayerScreen> {
           nextEp = (k >= 0 && k + 1 < a.length) ? a[k + 1] : null;
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      // çevrimdışı: sıradaki indirilmiş bölüm
+      final n = Downloads.I.nextDownloaded(i);
+      if (mounted && it?['Id'] == i['Id']) setState(() => nextEp = n);
+    }
+  }
+
+  // =================== sahne önizlemesi (Jellyfin trickplay) ===================
+  void _setupTrickplay() {
+    tp = null;
+    if (loc != null) return;
+    final m = it?['Trickplay'];
+    if (m is! Map || m.isEmpty) return;
+    final byMs = (m['${ms?['Id']}'] ?? m.values.first);
+    if (byMs is! Map || byMs.isEmpty) return;
+    // ~320 piksele en yakın genişlik
+    String best = '';
+    var diff = 1 << 30;
+    for (final k in byMs.keys) {
+      final w = int.tryParse('$k') ?? 0;
+      if (w > 0 && (w - 320).abs() < diff) {
+        diff = (w - 320).abs();
+        best = '$k';
+      }
+    }
+    if (best.isEmpty || byMs[best] is! Map) return;
+    tp = J.from(byMs[best] as Map);
+    tpW = best;
+  }
+
+  Widget _thumb(double secs) {
+    final t = tp!;
+    int n(String k, int d) => (t[k] as num?)?.toInt() ?? d;
+    final interval = max(1, n('Interval', 10000)), tw = max(1, n('TileWidth', 10)), th = max(1, n('TileHeight', 10));
+    final cnt = max(1, n('ThumbnailCount', 1));
+    final w = n('Width', 320).toDouble(), h = max(1, n('Height', 180)).toDouble();
+    final k = ((secs * 1000) ~/ interval).clamp(0, cnt - 1);
+    final per = tw * th, tile = k ~/ per, col = (k % per) % tw, row = (k % per) ~/ tw;
+    const dw = 176.0;
+    final sc = dw / w, dh = h * sc;
+    final url = '${api.url}/Videos/${it!['Id']}/Trickplay/$tpW/$tile.jpg?MediaSourceId=${ms!['Id']}&ApiKey=${api.token}';
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+        width: dw + 4,
+        height: dh + 4,
+        decoration: BoxDecoration(
+            color: Colors.black, border: Border.all(color: Colors.white, width: 2), borderRadius: BorderRadius.circular(4)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: OverflowBox(
+            alignment: Alignment.topLeft,
+            minWidth: 0,
+            minHeight: 0,
+            maxWidth: double.infinity,
+            maxHeight: double.infinity,
+            child: Transform.translate(
+              offset: Offset(-col * w * sc, -row * h * sc),
+              child: SizedBox(
+                width: tw * w * sc,
+                height: th * h * sc,
+                child: CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.fitWidth,
+                  alignment: Alignment.topLeft,
+                  fadeInDuration: Duration.zero,
+                  placeholder: (_, __) => const SizedBox.shrink(),
+                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(fmt(Duration(milliseconds: (secs * 1000).round())),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, shadows: [Shadow(blurRadius: 4)])),
+    ]);
+  }
+
+  // =================== sonraki bölüm geri sayımı ===================
+  void _checkCountdown(_Seg? seg) {
+    final n = nextEp, i = it;
+    if (n == null || i == null || !ready || dur <= Duration.zero) return;
+    final left = dur - pos;
+    final want = seg?.type == 'Outro' || left < const Duration(seconds: 15);
+    if (!want) {
+      if (cdT != null) {
+        cdT!.cancel();
+        cdT = null;
+      }
+      return;
+    }
+    if (cdT != null || !api.autoNext || cdOff == '${i['Id']}' || !playing) return;
+    cd = min(10, max(1, left.inSeconds));
+    cdT = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      if (!playing) return;
+      if (--cd <= 0) {
+        t.cancel();
+        cdT = null;
+        final nx = nextEp;
+        if (nx != null) _start(nx, restart: true);
+        return;
+      }
+      setState(() {});
+    });
+  }
+
+  void _cancelCountdown() {
+    cdT?.cancel();
+    cdT = null;
+    cdOff = '${it?['Id']}';
+    setState(() {});
   }
 
   void _onEnded() {
@@ -812,7 +961,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final i = it;
     final seg = _activeSeg();
     final nearEnd = dur > Duration.zero && dur - pos < const Duration(seconds: 40);
-    final showNext = nextEp != null && (nearEnd || seg?.type == 'Outro');
+    final showNext = nextEp != null && (nearEnd || seg?.type == 'Outro' || cdT != null);
     final title = i == null
         ? '${widget.item['Name'] ?? ''}'
         : (i['Type'] == 'Episode' ? '${i['SeriesName'] ?? ''}' : '${i['Name'] ?? ''}');
@@ -846,22 +995,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
               duration: const Duration(milliseconds: 200),
               left: 48,
               right: 48,
-              bottom: ui ? 110 : 30,
-              child: Text(
-                cue,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 21 * api.subSize,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  height: 1.25,
-                  shadows: const [
-                    Shadow(blurRadius: 4, color: Colors.black),
-                    Shadow(blurRadius: 2, color: Colors.black, offset: Offset(1, 1)),
-                    Shadow(blurRadius: 2, color: Colors.black, offset: Offset(-1, -1)),
-                  ],
-                ),
-              ),
+              bottom: (ui ? 110 : 30) + const [0.0, 50.0, 100.0][api.subLift.clamp(0, 2)],
+              child: Center(child: subtitleText(cue)),
             ),
           if (buffering && err.isEmpty) const Center(child: CircularProgressIndicator(color: Colors.white)),
           // yaş kartı
@@ -921,6 +1056,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         IconButton(iconSize: 40, icon: const Icon(Icons.forward_10), onPressed: () => _seekBy(10)),
                       ]),
                       const Spacer(),
+                      LayoutBuilder(builder: (context, cs) => Stack(clipBehavior: Clip.none, children: [
                       Row(children: [
                         SizedBox(width: 62, child: Text(fmt(dragging ? Duration(milliseconds: (dragV * 1000).round()) : pos), style: const TextStyle(fontSize: 13))),
                         Expanded(
@@ -956,6 +1092,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             width: 70,
                             child: Text('-${fmt(dur - pos)}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
                       ]),
+                      if (dragging && tp != null)
+                        Positioned(
+                          bottom: 30,
+                          left: (62 + 7 + (dragV / maxV).clamp(0.0, 1.0) * (cs.maxWidth - 62 - 70 - 14) - 90)
+                              .clamp(0.0, max(0.0, cs.maxWidth - 180)),
+                          child: IgnorePointer(child: _thumb(dragV)),
+                        ),
+                    ])),
                     ]),
                   ),
                 ),
@@ -969,7 +1113,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
             child: Row(children: [
               if (seg != null && !(showNext && seg.type == 'Outro'))
                 _pill(seg.type == 'Intro' ? 'Girişi atla' : 'Jeneriği atla', () => player.seek(seg.b)),
-              if (showNext) ...[
+              if (showNext && cdT != null) ...[
+                const SizedBox(width: 10),
+                _pill('İzlemeye devam', _cancelCountdown),
+                const SizedBox(width: 10),
+                _pill('Sonraki bölüm  $cd', () => _start(nextEp!, restart: true), primary: true),
+              ] else if (showNext) ...[
                 const SizedBox(width: 10),
                 _pill('Sonraki bölüm  ›', () => _start(nextEp!, restart: true), primary: true),
               ],
@@ -1034,4 +1183,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ]),
     );
   }
+}
+
+/// Ayarlardaki altyazı görünümüyle (boyut, renk, arka plan) altyazı satırı. Ayarlar ekranındaki önizleme de bunu kullanır.
+Widget subtitleText(String text, {double scale = 1}) {
+  final api = Api.I;
+  final bg = api.subBg;
+  final t = Text(
+    text,
+    textAlign: TextAlign.center,
+    style: TextStyle(
+      fontSize: 21 * api.subSize * scale,
+      fontWeight: FontWeight.w600,
+      color: api.subColor == 1 ? const Color(0xFFFFE14D) : Colors.white,
+      height: 1.25,
+      shadows: bg == 0
+          ? const [
+              Shadow(blurRadius: 4, color: Colors.black),
+              Shadow(blurRadius: 2, color: Colors.black, offset: Offset(1, 1)),
+              Shadow(blurRadius: 2, color: Colors.black, offset: Offset(-1, -1)),
+            ]
+          : null,
+    ),
+  );
+  if (bg == 0) return t;
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
+    decoration: BoxDecoration(
+      color: bg == 1 ? const Color(0x99000000) : Colors.black,
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: t,
+  );
 }

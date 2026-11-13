@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'nav.dart';
+import 'seerr.dart';
 import 'util.dart';
 import 'widgets.dart';
 
@@ -20,7 +21,7 @@ class _SearchScreenState extends State<SearchScreen> {
   int tok = 0;
   bool busy = false;
   List<String> genres = [];
-  List<J> results = [], people = [];
+  List<J> results = [], people = [], seerr = [];
 
   @override
   void initState() {
@@ -50,10 +51,12 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         results = [];
         people = [];
+        seerr = [];
         busy = false;
       });
       return;
     }
+    _seerr(v, my);
     setState(() => busy = true);
     final e = Uri.encodeQueryComponent(v);
     try {
@@ -69,6 +72,18 @@ class _SearchScreenState extends State<SearchScreen> {
       });
     } catch (_) {
       if (my == tok && mounted) setState(() => busy = false);
+    }
+  }
+
+  /// Sunucuda olmayanlar: Seerr'de ara (Jellyfin aramasını beklemeden, ayrı)
+  Future<void> _seerr(String v, int my) async {
+    if (!Seerr.I.on) return;
+    try {
+      final r = await Seerr.I.search(v);
+      if (my != tok || !mounted) return;
+      setState(() => seerr = r.where((x) => ((x['mediaInfo'] as Map?)?['status'] as num?) != 5).take(12).toList());
+    } catch (_) {
+      if (my == tok && mounted) setState(() => seerr = []);
     }
   }
 
@@ -176,7 +191,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                   if (busy && results.isEmpty) const SliverFillRemaining(hasScrollBody: false, child: Loading()),
-                  if (!busy && results.isEmpty)
+                  if (!busy && results.isEmpty && seerr.isEmpty)
                     const SliverFillRemaining(
                         hasScrollBody: false,
                         child: Center(child: Text('Sonuç bulunamadı.', style: TextStyle(color: kMuted)))),
@@ -191,6 +206,22 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                   ),
+                  if (seerr.isNotEmpty) ...[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(pad, 4, pad, 6),
+                        child: const Text('Sunucunda yok — Seerr\'den iste',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(pad, 0, pad, 30),
+                      sliver: SliverList.builder(
+                        itemCount: seerr.length,
+                        itemBuilder: (_, i) => SeerrResultTile(seerr[i], key: ValueKey('${seerr[i]['mediaType']}${seerr[i]['id']}')),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             ),
