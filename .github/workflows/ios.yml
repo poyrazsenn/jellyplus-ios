@@ -84,8 +84,8 @@ jobs:
           echo "v=$V" >> "$GITHUB_OUTPUT"
           echo "Sürüm: $V"
 
-      - name: GitHub sürümü (v2 dalı → ön sürüm)
-        if: github.ref == 'refs/heads/v2' || startsWith(github.ref, 'refs/tags/v')
+      - name: GitHub sürümü (main → kararlı, v2 → ön sürüm; '-' içeren sürüm ön sürümdür)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/v2' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.v }}

@@ -1,5 +1,5 @@
 /// Uygulama sürümü. Yeni sürüm uyarısı ve "Yenilikler" ekranı bunu kullanır.
-const kVersion = '2.0.0-beta.1';
+const kVersion = '2.0.0';
 
 /// Bu sürümde gelenler (ilk açılışta bir kez gösterilir).
 const kWhatsNew = <List<String>>[

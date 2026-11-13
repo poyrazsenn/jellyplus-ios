@@ -1,4 +1,4 @@
-## Jelly+ 2.0 — ön sürüm (beta)
+## Jelly+ 2.0
 
 **Yenilikler**
 - **Çevrimdışı izle:** Film ve bölümleri orijinal ya da küçük (720p) kalitede indir; yeni **İndirilenler** sekmesinden internetsiz izle. Kaldığın yer internet gelince Jellyfin'e yazılır. "İzleyince sil" seçeneği.
