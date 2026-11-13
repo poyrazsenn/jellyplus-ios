@@ -97,6 +97,7 @@ class Downloads extends ChangeNotifier {
   bool _running = false, _ready = false;
   http.Client? _client;
   Dl? _cur;
+  final Set<String> _justWatched = {}; // bu oturumda bitirilenler ("izleyince sil" sadece bunları siler)
 
   Api get api => Api.I;
 
@@ -473,7 +474,10 @@ class Downloads extends ChangeNotifier {
     if (d != null) {
       final ud = J.from((d.item['UserData'] as Map?) ?? const {});
       ud['PlaybackPositionTicks'] = played ? 0 : posTicks;
-      if (played) ud['Played'] = true;
+      if (played) {
+        ud['Played'] = true;
+        _justWatched.add(id);
+      }
       d.item['UserData'] = ud;
     }
     final p = _pending;
@@ -485,9 +489,10 @@ class Downloads extends ChangeNotifier {
   /// Oynatıcı kapanınca: "izleyince sil" açıksa izlenmiş dosyaları kaldır.
   Future<void> cleanupWatched() async {
     if (!autoDelete) return;
-    for (final d in list.where((d) => d.state == DlState.done && d.watched).toList()) {
+    for (final d in list.where((d) => d.state == DlState.done && _justWatched.contains(d.id)).toList()) {
       await remove(d);
     }
+    _justWatched.clear();
   }
 
   bool _syncing = false;
