@@ -6,7 +6,7 @@
 - **Sahne önizlemesi:** Oynatıcıda ilerleme çubuğunu kaydırınca sahnenin küçük resmi (Jellyfin trickplay).
 - **Sonraki bölüm geri sayımı:** Jenerik başlayınca 10 saniyelik geri sayım; "İzlemeye devam" ile iptal.
 - **Altyazı görünümü:** Renk, arka plan kutusu ve konum (Profil → Altyazı görünümü).
-- **Yeni sürüm uyarısı** ve ilk açılışta "Yenilikler".
+- **Yeni sürüm uyarısı:** Yeni sürüm çıkınca haber verir; güncellemeden sonra ilk açılışta "Yenilikler" penceresi.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin silinmez.
 

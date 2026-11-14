@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'util.dart';
 import 'version.dart';
+import 'whats_new.g.dart';
 
 /// "1.2.3-beta.4" → karşılaştırılabilir parçalar. Ön sürüm, aynı numaralı kararlı sürümden eskidir.
 int compareVersions(String a, String b) {
@@ -33,11 +34,17 @@ int compareVersions(String a, String b) {
 }
 
 const _icons = {
-  'download_for_offline': Icons.download_for_offline_outlined,
-  'playlist_add': Icons.playlist_add,
-  'view_carousel': Icons.view_carousel_outlined,
-  'skip_next': Icons.skip_next_outlined,
+  'download': Icons.download_for_offline_outlined,
+  'request': Icons.playlist_add,
+  'preview': Icons.view_carousel_outlined,
+  'next': Icons.skip_next_outlined,
   'subtitles': Icons.subtitles_outlined,
+  'layout': Icons.dashboard_outlined,
+  'person': Icons.person_outline,
+  'library': Icons.video_library_outlined,
+  'update': Icons.new_releases_outlined,
+  'audio': Icons.graphic_eq,
+  'speed': Icons.speed,
 };
 
 /// Güncellemeden sonraki ilk açılışta bir kez "Yenilikler".
@@ -45,6 +52,8 @@ Future<void> showWhatsNew(BuildContext context, {bool force = false}) async {
   final p = Api.I.prefs;
   if (!force && p.getString('seenver') == kVersion) return;
   await p.setString('seenver', kVersion);
+  // sürüm notlarında "Yenilikler" yoksa (sadece düzeltme) pencere çıkmaz
+  if (kWhatsNew.isEmpty) return;
   if (!context.mounted) return;
   await showDialog(
     context: context,
