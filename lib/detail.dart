@@ -6,6 +6,7 @@ import 'api.dart';
 import 'downloads.dart';
 import 'downloads_screen.dart';
 import 'nav.dart';
+import 'person.dart';
 import 'theme_music.dart';
 import 'util.dart';
 import 'widgets.dart';
@@ -538,7 +539,6 @@ class _DetailScreenState extends State<DetailScreen> {
     final rows = <List<String>>[
       ['Yönetmen', names((p) => p['Type'] == 'Director')],
       ['Senaryo', names((p) => p['Type'] == 'Writer')],
-      ['Oyuncular', names((p) => p['Type'] == 'Actor', 12)],
       ['Türler', ((x['Genres'] as List?) ?? const []).join(', ')],
       ['Stüdyo', ((x['Studios'] as List?) ?? const []).map((s) => '${s['Name']}').join(', ')],
       ['Yaş sınırı', '${x['OfficialRating'] ?? ''}'],
@@ -546,7 +546,51 @@ class _DetailScreenState extends State<DetailScreen> {
       ['Yayın', '${x['PremiereDate'] ?? ''}'.split('T').first],
       ['Süre', rt(x['RunTimeTicks'])],
     ].where((r) => r[1].isNotEmpty).toList();
+    final cast = people.where((p) => p['Type'] == 'Actor' || p['Type'] == 'Director').take(24).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (cast.isNotEmpty) ...[
+        const Text('Oyuncular ve ekip', style: TextStyle(color: kMuted, fontSize: 12)),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 128,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: cast.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (c, i) {
+              final p = cast[i];
+              final tag = p['PrimaryImageTag'];
+              return InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => Navigator.of(c).push(
+                    MaterialPageRoute(builder: (_) => PersonScreen(id: '${p['Id']}', name: '${p['Name']}'))),
+                child: SizedBox(
+                  width: 76,
+                  child: Column(children: [
+                    ClipOval(
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        color: kCard,
+                        child: tag == null
+                            ? const Icon(Icons.person, color: kMuted)
+                            : netImg(Api.I.image('${p['Id']}', 'Primary', tag: '$tag', w: 160)),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text('${p['Name']}',
+                        maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                    Text(p['Type'] == 'Director' ? 'Yönetmen' : '${p['Role'] ?? ''}',
+                        maxLines: 1, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10, color: kMuted)),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
       if (((x['Taglines'] as List?) ?? const []).isNotEmpty)
         Padding(
           padding: const EdgeInsets.only(bottom: 14),

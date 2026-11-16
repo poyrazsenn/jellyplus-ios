@@ -9,6 +9,7 @@ import 'downloads_screen.dart';
 import 'home.dart';
 import 'library.dart';
 import 'player.dart' show subtitleText;
+import 'scan.dart';
 import 'search.dart';
 import 'seerr.dart';
 import 'theme_music.dart';
@@ -521,6 +522,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _choice('Renk', ['Beyaz', 'Sarı'], api.subColor, (v) => api.subColor = v),
         _choice('Arka plan', ['Gölge', 'Yarı saydam', 'Siyah kutu'], api.subBg, (v) => api.subBg = v),
         _choice('Konum', ['Alt', 'Biraz yukarı', 'Yukarı'], api.subLift, (v) => api.subLift = v),
+        if (api.admin) ...[
+          _head('SUNUCU'),
+          const ScanTile(),
+        ],
         _head('İNDİRMELER'),
         SwitchListTile(
           secondary: const Icon(Icons.auto_delete_outlined),

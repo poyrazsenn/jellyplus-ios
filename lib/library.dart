@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'scan.dart';
 import 'util.dart';
 import 'widgets.dart';
 
@@ -95,6 +96,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
       appBar: AppBar(
         title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w700)),
         automaticallyImplyLeading: !widget.root,
+        actions: [
+          if (Api.I.admin && RegExp(r'ParentId=([0-9a-f]+)').hasMatch(widget.extra))
+            IconButton(
+              tooltip: 'Bu kütüphaneyi tara',
+              icon: const Icon(Icons.manage_search),
+              onPressed: () async {
+                final id = RegExp(r'ParentId=([0-9a-f]+)').firstMatch(widget.extra)!.group(1)!;
+                final ok = await Scanner.I.scanOne(id);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(ok
+                        ? 'Tarama başladı. Yeni dosyalar birkaç dakika içinde görünür.'
+                        : 'Tarama başlatılamadı.')));
+                if (ok) {
+                  Future.delayed(const Duration(seconds: 25), () {
+                    if (mounted) load(true);
+                  });
+                }
+              },
+            ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () => load(true),

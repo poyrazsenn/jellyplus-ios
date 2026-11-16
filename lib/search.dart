@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'nav.dart';
+import 'person.dart';
 import 'seerr.dart';
 import 'util.dart';
 import 'widgets.dart';
@@ -183,7 +184,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                 child: ActionChip(
                                   avatar: const Icon(Icons.person, size: 18),
                                   label: Text('${p['Name']}'),
-                                  onPressed: () => openLibrary(context, '${p['Name']}', '&PersonIds=${p['Id']}'),
+                                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                                      builder: (_) => PersonScreen(id: '${p['Id']}', name: '${p['Name']}'))),
                                 ),
                               ),
                           ],
