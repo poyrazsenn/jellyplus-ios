@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -24,6 +25,8 @@ class Dl {
   String err;
   int added;
   int? audio; // küçük kopyada seçilen ses akışı
+  bool bg; // iOS arka plan indirmesiyle iniyor
+  bool noBg; // arka plan indirmesi başarısız oldu → uygulama içi motor
 
   Dl(this.id, this.item, this.quality,
       {this.state = DlState.queued,
@@ -35,7 +38,9 @@ class Dl {
       this.wide,
       this.err = '',
       int? added,
-      this.audio})
+      this.audio,
+      this.bg = false,
+      this.noBg = false})
       : subs = subs ?? {},
         added = added ?? DateTime.now().millisecondsSinceEpoch;
 
@@ -62,6 +67,8 @@ class Dl {
         'err': err,
         'added': added,
         'audio': audio,
+        'bg': bg,
+        'nobg': noBg,
       };
 
   static Dl fromJson(J j) => Dl(
@@ -78,13 +85,16 @@ class Dl {
         err: '${j['err'] ?? ''}',
         added: (j['added'] as num?)?.toInt(),
         audio: (j['audio'] as num?)?.toInt(),
+        bg: j['bg'] == true,
+        noBg: j['nobg'] == true,
       );
 }
 
 class _Cancelled implements Exception {}
 
-/// İndirme kuyruğu. Aynı anda tek dosya iner; uygulama arka plana geçip iOS indirmeyi
-/// keserse, uygulama tekrar açılınca kaldığı bayttan devam eder (orijinal kalite).
+/// İndirme kuyruğu. Video dosyası iOS'un arka plan indirmesiyle iner (telefon kilitliyken,
+/// uygulama kapalıyken de sürer). Arka plan indirmesi başlatılamaz ya da hata verirse o dosya
+/// sessizce uygulama içi motorla (2.0'daki, uygulama açıkken inen) indirilir.
 class Downloads extends ChangeNotifier {
   Downloads._();
   static final Downloads I = Downloads._();
@@ -98,6 +108,17 @@ class Downloads extends ChangeNotifier {
   http.Client? _client;
   Dl? _cur;
   final Set<String> _justWatched = {}; // bu oturumda bitirilenler ("izleyince sil" sadece bunları siler)
+  final Map<String, Completer<TaskStatus>> _bgWait = {};
+  DateTime _lastBgNotify = DateTime(0);
+
+  static String _tid(String id) => 'jp_$id';
+
+  /// Ayarlardan kapatılabilir; kapalıyken her şey 2.0'daki gibi uygulama içinde iner.
+  bool get bgOn => api.prefs.getBool('dlbg') ?? true;
+  set bgOn(bool v) {
+    api.prefs.setBool('dlbg', v);
+    notifyListeners();
+  }
 
   Api get api => Api.I;
 
@@ -112,8 +133,9 @@ class Downloads extends ChangeNotifier {
         ..clear()
         ..addAll(l.map((e) => Dl.fromJson(J.from(e as Map))));
     } catch (_) {}
+    await _bgInit();
     for (final d in list) {
-      if (d.state == DlState.running) d.state = DlState.queued;
+      if (d.state == DlState.running && !d.bg) d.state = DlState.queued;
       if (d.state == DlState.done && !File(path(d)).existsSync()) {
         d.state = DlState.failed;
         d.err = 'Dosya bulunamadı';
@@ -121,6 +143,146 @@ class Downloads extends ChangeNotifier {
     }
     _ready = true;
     await _save();
+  }
+
+  // ---------- iOS arka plan indirmesi ----------
+  Future<void> _bgInit() async {
+    try {
+      FileDownloader().updates.listen(_onBg);
+      await FileDownloader().trackTasks();
+      // uygulama kapalıyken arka planda süren / biten indirmeler
+      for (final d in list.where((d) => d.bg && d.state == DlState.running).toList()) {
+        final r = await FileDownloader().database.recordForId(_tid(d.id));
+        if (r == null) {
+          d.state = DlState.queued;
+          d.bg = false;
+        } else if (r.status == TaskStatus.complete) {
+          await _bgDone(d);
+        } else if (r.status.isFinalState) {
+          _bgFallback(d);
+        }
+        // hâlâ sürüyorsa: bitince _onBg haber verir
+      }
+      await FileDownloader().resumeFromBackground();
+    } catch (_) {
+      // eklenti çalışmazsa her şey uygulama içi motorla iner
+      for (final d in list.where((d) => d.bg && d.state == DlState.running)) {
+        d.state = DlState.queued;
+        d.bg = false;
+      }
+    }
+  }
+
+  void _onBg(TaskUpdate u) {
+    final tid = u.task.taskId;
+    if (!tid.startsWith('jp_')) return;
+    final d = of(tid.substring(3));
+    if (u is TaskProgressUpdate) {
+      if (d == null || u.progress < 0) return;
+      if (u.expectedFileSize > 0) d.total = u.expectedFileSize;
+      if (d.total > 0) d.got = (u.progress * d.total).round();
+      final now = DateTime.now();
+      if (now.difference(_lastBgNotify).inMilliseconds > 700) {
+        _lastBgNotify = now;
+        notifyListeners();
+      }
+    } else if (u is TaskStatusUpdate) {
+      final st = u.status;
+      if (!st.isFinalState && st != TaskStatus.paused) return;
+      final w = _bgWait[tid];
+      if (w != null && !w.isCompleted) {
+        w.complete(st);
+      } else if (d != null) {
+        _bgOrphan(d, st); // uygulama yeniden açıldıktan sonra biten indirme
+      }
+    }
+  }
+
+  Future<void> _bgDone(Dl d) async {
+    final f = File(path(d));
+    d.got = await f.exists() ? await f.length() : d.got;
+    d.total = d.got;
+    d.state = DlState.done;
+    await _save();
+    notifyListeners();
+  }
+
+  void _bgFallback(Dl d) {
+    d.bg = false;
+    d.noBg = true;
+    d.state = DlState.queued;
+    _save();
+    notifyListeners();
+    kick();
+  }
+
+  Future<void> _bgOrphan(Dl d, TaskStatus st) async {
+    if (!list.contains(d)) return;
+    switch (st) {
+      case TaskStatus.complete:
+        await _bgDone(d);
+        break;
+      case TaskStatus.paused:
+      case TaskStatus.canceled:
+        if (d.state == DlState.running) d.state = DlState.paused;
+        await _save();
+        notifyListeners();
+        break;
+      default:
+        _bgFallback(d);
+    }
+  }
+
+  /// null: arka plan kullanılamadı → uygulama içi motor denensin.
+  Future<bool?> _runBg(Dl d, String url, bool small, J ms) async {
+    final f = File(path(d));
+    if (await f.exists()) await f.delete(); // arka plan indirmesi baştan yazar
+    final task = DownloadTask(
+      taskId: _tid(d.id),
+      url: url,
+      filename: d.file.split('/').last,
+      directory: 'downloads/${d.id}',
+      baseDirectory: BaseDirectory.applicationSupport,
+      updates: Updates.statusAndProgress,
+      allowPause: !small,
+      retries: 3,
+    );
+    d.got = 0;
+    d.total = small ? _estimate(d.item) : ((ms['Size'] as num?)?.toInt() ?? 0);
+    final w = Completer<TaskStatus>();
+    _bgWait[task.taskId] = w;
+    bool ok;
+    try {
+      ok = await FileDownloader().enqueue(task);
+    } catch (_) {
+      ok = false;
+    }
+    if (!ok) {
+      _bgWait.remove(task.taskId);
+      return null;
+    }
+    d.bg = true;
+    await _save();
+    notifyListeners();
+    final st = await w.future;
+    _bgWait.remove(task.taskId);
+    if (!list.contains(d)) return true; // silindi
+    switch (st) {
+      case TaskStatus.complete:
+        await _bgDone(d);
+        return true;
+      case TaskStatus.paused:
+      case TaskStatus.canceled:
+        if (d.state == DlState.running) d.state = DlState.paused;
+        await _save();
+        notifyListeners();
+        return true;
+      default:
+        // hata: bu dosya için arka planı bırak, uygulama içi motorla dene
+        d.bg = false;
+        d.noBg = true;
+        return null;
+    }
   }
 
   Future<void> _save() async {
@@ -248,16 +410,41 @@ class Downloads extends ChangeNotifier {
     }
   }
 
-  void pause(Dl d) {
+  Future<void> pause(Dl d) async {
     if (d.state == DlState.queued || d.state == DlState.running) {
+      final wasBg = d.bg && d.state == DlState.running;
       d.state = DlState.paused;
       if (_cur == d) _client?.close();
       _save();
       notifyListeners();
+      if (wasBg) {
+        try {
+          final t = await FileDownloader().taskForId(_tid(d.id));
+          final ok = t is DownloadTask && await FileDownloader().pause(t);
+          if (!ok) {
+            await FileDownloader().cancelTaskWithId(_tid(d.id));
+            d.bg = false;
+            _save();
+          }
+        } catch (_) {}
+      }
     }
   }
 
-  void resume(Dl d) {
+  Future<void> resume(Dl d) async {
+    if (d.state == DlState.paused && d.bg) {
+      // arka planda duraklatılmış: kaldığı yerden sürdür
+      try {
+        final t = await FileDownloader().taskForId(_tid(d.id));
+        if (t is DownloadTask && await FileDownloader().resume(t)) {
+          d.state = DlState.running;
+          _save();
+          notifyListeners();
+          return;
+        }
+      } catch (_) {}
+      d.bg = false;
+    }
     if (d.state == DlState.paused || d.state == DlState.failed) {
       d.state = DlState.queued;
       d.err = '';
@@ -282,6 +469,13 @@ class Downloads extends ChangeNotifier {
   Future<void> remove(Dl d) async {
     list.remove(d);
     if (_cur == d) _client?.close();
+    if (d.bg) {
+      try {
+        await FileDownloader().cancelTaskWithId(_tid(d.id));
+      } catch (_) {}
+      final w = _bgWait.remove(_tid(d.id));
+      if (w != null && !w.isCompleted) w.complete(TaskStatus.canceled);
+    }
     await _save();
     notifyListeners();
     try {
@@ -385,6 +579,11 @@ class Downloads extends ChangeNotifier {
               '&MaxWidth=1280&MaxHeight=720&MaxAudioChannels=2&TranscodingMaxAudioChannels=2'
               '${d.audio != null ? '&AudioStreamIndex=${d.audio}' : ''}'
           : '${api.url}/Videos/${d.id}/stream?static=true&MediaSourceId=$msId&ApiKey=${api.token}';
+      if (bgOn && !d.noBg) {
+        final r = await _runBg(d, url, small, ms);
+        if (r != null) return r;
+        if (!list.contains(d) || d.state != DlState.running) return true;
+      }
       var start = 0;
       if (await f.exists()) {
         if (small) {

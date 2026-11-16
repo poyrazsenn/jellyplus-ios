@@ -3,10 +3,7 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['download', 'Çevrimdışı izle', 'Film ve bölümleri orijinal ya da küçük (720p) kalitede indir; yeni İndirilenler sekmesinden internetsiz izle. Kaldığın yer internet gelince Jellyfin\'e yazılır. "İzleyince sil" seçeneği.'],
-  ['request', 'Seerr istekleri', 'Aramada sunucuda olmayan film/diziler için İste düğmesi; Profil → İsteklerim\'de bekliyor / indiriliyor (%) / hazır durumu.'],
-  ['preview', 'Sahne önizlemesi', 'Oynatıcıda ilerleme çubuğunu kaydırınca sahnenin küçük resmi (Jellyfin trickplay).'],
-  ['next', 'Sonraki bölüm geri sayımı', 'Jenerik başlayınca 10 saniyelik geri sayım; "İzlemeye devam" ile iptal.'],
-  ['subtitles', 'Altyazı görünümü', 'Renk, arka plan kutusu ve konum (Profil → Altyazı görünümü).'],
-  ['update', 'Yeni sürüm uyarısı', 'Yeni sürüm çıkınca haber verir; güncellemeden sonra ilk açılışta "Yenilikler" penceresi.'],
+  ['download', 'Arka planda indirme', 'İndirme artık telefon kilitliyken ve uygulama kapalıyken de sürer. Sorun olursa Profil → İndirmeler\'den kapatabilirsin; o zaman 2.0\'daki gibi uygulama açıkken iner.'],
+  ['person', 'Oyuncu sayfası', 'Bir oyuncuya ya da yönetmene dokununca fotoğrafı, biyografisi, doğum (ve varsa ölüm) tarihi ile yaşı, doğum yeri ve arşivindeki filmleri. Detay sayfasının Detaylar sekmesinde ve aramada.'],
+  ['library', 'Kütüphaneyi tara', 'Yönetici hesabında Profil → Sunucu → Kütüphaneyi tara (ilerlemesiyle); kütüphane sayfalarında sağ üstteki düğmeyle sadece o kütüphane. Yeni eklenen dosyalar bilgisayara geçmeden görünür.'],
 ];

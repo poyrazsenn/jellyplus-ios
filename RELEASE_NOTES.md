@@ -1,13 +1,10 @@
-## Jelly+ 2.0
+## Jelly+ 2.1
 
 **Yenilikler**
-- **Çevrimdışı izle:** Film ve bölümleri orijinal ya da küçük (720p) kalitede indir; yeni **İndirilenler** sekmesinden internetsiz izle. Kaldığın yer internet gelince Jellyfin'e yazılır. "İzleyince sil" seçeneği.
-- **Seerr istekleri:** Aramada sunucuda olmayan film/diziler için **İste** düğmesi; Profil → İsteklerim'de bekliyor / indiriliyor (%) / hazır durumu.
-- **Sahne önizlemesi:** Oynatıcıda ilerleme çubuğunu kaydırınca sahnenin küçük resmi (Jellyfin trickplay).
-- **Sonraki bölüm geri sayımı:** Jenerik başlayınca 10 saniyelik geri sayım; "İzlemeye devam" ile iptal.
-- **Altyazı görünümü:** Renk, arka plan kutusu ve konum (Profil → Altyazı görünümü).
-- **Yeni sürüm uyarısı:** Yeni sürüm çıkınca haber verir; güncellemeden sonra ilk açılışta "Yenilikler" penceresi.
+- **Arka planda indirme:** İndirme artık telefon kilitliyken ve uygulama kapalıyken de sürer. Sorun olursa Profil → İndirmeler'den kapatabilirsin; o zaman 2.0'daki gibi uygulama açıkken iner.
+- **Oyuncu sayfası:** Bir oyuncuya ya da yönetmene dokununca fotoğrafı, biyografisi, doğum (ve varsa ölüm) tarihi ile yaşı, doğum yeri ve arşivindeki filmleri. Detay sayfasının Detaylar sekmesinde ve aramada.
+- **Kütüphaneyi tara:** Yönetici hesabında Profil → Sunucu → Kütüphaneyi tara (ilerlemesiyle); kütüphane sayfalarında sağ üstteki düğmeyle sadece o kütüphane. Yeni eklenen dosyalar bilgisayara geçmeden görünür.
 
-**Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin silinmez.
+**Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.
 
-**Bilinen sınırlar:** İndirme uygulama açıkken sürer (arka plana alınırsa açınca devam eder). Resim altyazılar (PGS) indirilen dosyada gösterilmez.
+**Bilinen sınırlar:** Küçük (720p) kalitede duraklatılan indirme baştan başlar. Resim altyazılar (PGS) indirilen dosyada gösterilmez.

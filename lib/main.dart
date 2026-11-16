@@ -534,6 +534,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: Downloads.I.autoDelete,
           onChanged: (v) => setState(() => Downloads.I.autoDelete = v),
         ),
+        SwitchListTile(
+          secondary: const Icon(Icons.cloud_download_outlined),
+          title: const Text('Arka planda indir'),
+          subtitle: const Text('Telefon kilitliyken ve uygulama kapalıyken de sürer. Sorun olursa kapat; 2.0\'daki gibi uygulama açıkken iner.',
+              style: TextStyle(color: kMuted)),
+          value: Downloads.I.bgOn,
+          onChanged: (v) => setState(() => Downloads.I.bgOn = v),
+        ),
         _head('İSTEKLER (SEERR)'),
         if (Seerr.I.on)
           ListTile(

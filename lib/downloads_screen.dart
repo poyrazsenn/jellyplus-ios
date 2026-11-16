@@ -36,7 +36,7 @@ Future<void> askDownload(BuildContext context, List<J> items, {String? title}) a
               '${small > 0 ? 'yaklaşık ${fmtBytes(small)} • ' : ''}Sunucu bir kez küçültür, yer kazandırır'),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 4, 16, 14),
-            child: Text('İndirme uygulama açıkken sürer. Arka plana alınırsa, açınca kaldığı yerden devam eder.',
+            child: Text('İndirme telefon kilitliyken ve uygulama kapalıyken de sürer.',
                 style: TextStyle(color: kMuted, fontSize: 11)),
           ),
         ]),
