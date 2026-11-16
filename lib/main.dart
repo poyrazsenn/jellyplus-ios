@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
@@ -282,11 +285,22 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int tab = 0;
   static const dlTab = 3;
   final keys = List.generate(5, (_) => GlobalKey<NavigatorState>());
+  bool offline = false;
+  StreamSubscription<List<ConnectivityResult>>? _net;
+
+  static bool _isOff(List<ConnectivityResult> r) => r.isEmpty || r.every((x) => x == ConnectivityResult.none);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Netflix gibi: internet kesildiği an İndirilenler'e geç
+    Connectivity().checkConnectivity().then((r) {
+      if (_isOff(r)) _goOffline();
+    }).catchError((_) {});
+    _net = Connectivity().onConnectivityChanged.listen((r) {
+      _isOff(r) ? _goOffline() : _goOnline();
+    }, onError: (_) {});
     Api.I.loadMe().then((_) {
       _online();
       if (!mounted) return;
@@ -312,7 +326,30 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _net?.cancel();
     super.dispose();
+  }
+
+  void _goOffline() {
+    if (!mounted || offline) return;
+    ThemeMusic.I.stop(hard: true);
+    setState(() {
+      offline = true;
+      tab = dlTab;
+    });
+    keys[dlTab].currentState?.popUntil((r) => r.isFirst);
+  }
+
+  void _goOnline() {
+    if (!mounted || !offline) return;
+    setState(() => offline = false);
+    _online();
+    refreshBus.value++;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('İnternet geri geldi.'),
+      duration: const Duration(seconds: 4),
+      action: tab == 0 ? null : SnackBarAction(label: 'Ana sayfa', onPressed: () => setState(() => tab = 0)),
+    ));
   }
 
   /// Sunucuya ulaşılınca: bekleyen çevrimdışı ilerlemeyi yaz, yarım indirmeleri sürdür.
@@ -347,7 +384,27 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           tabNav(3, const DownloadsScreen()),
           tabNav(4, const SettingsScreen()),
         ]),
-        bottomNavigationBar: Theme(
+        bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            child: offline
+                ? Container(
+                    width: double.infinity,
+                    color: const Color(0xFF2A2F3D),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(children: [
+                      const Icon(Icons.cloud_off, size: 16, color: Colors.white70),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                            Downloads.I.hasDone ? 'Çevrimdışısın. İndirdiklerini izleyebilirsin.' : 'Çevrimdışısın. İnternet yokken indirdiklerin burada olur.',
+                            style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                      ),
+                    ]),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+          Theme(
           data: Theme.of(context).copyWith(splashColor: Colors.transparent, highlightColor: Colors.transparent),
           child: BottomNavigationBar(
             currentIndex: tab,
@@ -377,6 +434,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             ],
           ),
         ),
+        ]),
       ),
     );
   }
