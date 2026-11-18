@@ -3,6 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['library', 'Yeni ana sayfa', 'Disney+ kutuları kalktı. Kütüphanelere cam kısayollar, büyük "İzlemeye devam et" kartları (altında kalan süre), yuvarlak köşeli çerçevesiz kartlar ve sıra başlığına dokununca tümünü görme.'],
-  ['star', 'Ayarlardaki soru işaretleri düzeldi', 'Ok ve tik simgeleri artık doğru görünüyor.'],
+  ['star', 'Disney+ izleri temizlendi', 'Yuvarlak yaş ve içerik simgeleri kalktı. Detayda yaş sınırı Apple TV gibi ince çerçeveli "13+" etiketi; oynatıcıda açılışta küçük cam bilgi kartı.'],
+  ['next', 'Yeni sezon düğmeleri', 'Dizilerde "Sezon 1, Sezon 2" cam kapsüller; seçili sezon beyaz. Bölüm kartları yuvarlak köşeli, ilerleme çubuğu içeride.'],
 ];

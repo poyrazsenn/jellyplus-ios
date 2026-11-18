@@ -1543,29 +1543,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Widget _ageCard(J i) {
-    final k = ageKey(i['OfficialRating']);
+    final a = ageLabel(i['OfficialRating']);
     final ds = descs(i);
-    final g = ((i['Genres'] as List?) ?? const []).take(3).join(', ');
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 380),
-      padding: const EdgeInsets.fromLTRB(12, 10, 18, 10),
-      decoration: const BoxDecoration(
-        color: Color(0xA6000000),
-        border: Border(left: BorderSide(color: Colors.white, width: 4)),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (k != null) Padding(padding: const EdgeInsets.only(right: 8), child: AgeBadge(i['OfficialRating'], size: 38)),
-        for (final d in ds) Padding(padding: const EdgeInsets.only(right: 8), child: DescIcon(d, size: 38)),
-        Flexible(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(k != null ? kAgeText[k]! : '${i['OfficialRating'] ?? 'İçerik uyarısı'}',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-            if (ds.isNotEmpty)
-              Text(ds.map((d) => kDesc[d]).join(' • '), style: const TextStyle(color: Color(0xFFCFD5EA), fontSize: 12)),
-            if (g.isNotEmpty) Text(g, style: const TextStyle(color: Color(0xFFCFD5EA), fontSize: 12)),
-          ]),
-        ),
-      ]),
+    final line = [if (a != null) a, ...ds.map((d) => kDesc[d]!)].join(' · ');
+    return Glass(
+      radius: 14,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      child: Text(line, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
     );
   }
 }

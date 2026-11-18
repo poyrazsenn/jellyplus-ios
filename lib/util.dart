@@ -51,6 +51,13 @@ String? ageKey(String? r) {
   return n <= 0 ? 'all' : (n <= 9 ? '7' : (n <= 17 ? '13' : '18'));
 }
 
+/// Apple TV gibi düz yaş etiketi: 13+, Genel
+String? ageLabel(String? r) {
+  final k = ageKey(r);
+  if (k == null) return null;
+  return k == 'all' ? 'Genel' : '$k+';
+}
+
 const kAgeText = {
   'all': 'Genel izleyici kitlesi',
   '7': '7 yaş ve üzeri',

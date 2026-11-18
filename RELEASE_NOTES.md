@@ -1,6 +1,11 @@
-## Poyraz Player 3.0 — beta 4
+## Poyraz Player 3.0 — beta 5
 
 **Yenilikler**
+
+- **Disney+ izleri temizlendi:** Yuvarlak yaş ve içerik simgeleri kalktı. Detayda yaş sınırı Apple TV gibi ince çerçeveli "13+" etiketi; oynatıcıda açılışta küçük cam bilgi kartı.
+- **Yeni sezon düğmeleri:** Dizilerde "Sezon 1, Sezon 2" cam kapsüller; seçili sezon beyaz. Bölüm kartları yuvarlak köşeli, ilerleme çubuğu içeride.
+
+**Beta 4'te gelenler**
 
 - **Yeni ana sayfa:** Disney+ kutuları kalktı. Kütüphanelere cam kısayollar, büyük "İzlemeye devam et" kartları (altında kalan süre), yuvarlak köşeli çerçevesiz kartlar ve sıra başlığına dokununca tümünü görme.
 - **Ayarlardaki soru işaretleri düzeldi:** Ok ve tik simgeleri artık doğru görünüyor.

@@ -158,9 +158,8 @@ class _DetailScreenState extends State<DetailScreen> {
       else
         rt(x['RunTimeTicks']),
       if (x['CommunityRating'] != null) '★ ${(x['CommunityRating'] as num).toStringAsFixed(1)}',
-    ].where((s) => s.isNotEmpty).join(' • ');
+    ].where((s) => s.isNotEmpty).join(' · ');
     final genres = ((x['Genres'] as List?) ?? const []).take(4).join(', ');
-    final ds = descs(x);
     final seasons = eps.map((e) => e['ParentIndexNumber'] as num?).toSet().toList();
     final tabs = [
       if (eps.isNotEmpty) ['eps', 'Bölümler'],
@@ -230,16 +229,15 @@ class _DetailScreenState extends State<DetailScreen> {
         SliverPadding(
           padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
           sliver: SliverList.list(children: [
-            Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              AgeBadge(x['OfficialRating'], size: 26),
-              for (final k in ds) DescIcon(k, size: 26),
-              for (final c in chips)
+            Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Text(meta, style: const TextStyle(color: Color(0xB8F5F5F7), fontSize: 13)),
+              for (final c in [if (ageLabel(x['OfficialRating']) != null) ageLabel(x['OfficialRating'])!, ...chips])
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.white.withAlpha(46), borderRadius: BorderRadius.circular(4)),
-                  child: Text(c, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0x80F5F5F7), width: 1), borderRadius: BorderRadius.circular(4)),
+                  child: Text(c, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xB8F5F5F7))),
                 ),
-              Text(meta, style: const TextStyle(color: Color(0xFFDFE4F5), fontSize: 13)),
             ]),
             if (genres.isNotEmpty)
               Padding(padding: const EdgeInsets.only(top: 6), child: Text(genres, style: const TextStyle(fontSize: 13))),
@@ -400,18 +398,34 @@ class _DetailScreenState extends State<DetailScreen> {
           if (seasons.length > 1)
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 44,
+                height: 48,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: pad),
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(pad, 6, pad, 6),
                   children: [
                     for (final s in seasons)
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(s == null || s == 0 ? 'Özel' : '$s. Sezon'),
-                          selected: s == season,
-                          onSelected: (_) => setState(() => season = s),
+                        child: Pressable(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => season = s);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: s == season ? kBlue : const Color(0x1FFFFFFF),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Text(s == null || s == 0 ? 'Özel' : 'Sezon $s',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: s == season ? kInk : const Color(0xFFF5F5F7))),
+                          ),
                         ),
                       ),
                   ],
@@ -465,7 +479,7 @@ class _DetailScreenState extends State<DetailScreen> {
     final img = ((e['ImageTags'] as Map?)?['Primary']) != null
         ? api.image(e['Id'], 'Primary', tag: e['ImageTags']['Primary'], w: 400)
         : backdrop(e, w: 400);
-    return InkWell(
+    return Pressable(
       onTap: () => openPlayer(c, e),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
@@ -473,16 +487,20 @@ class _DetailScreenState extends State<DetailScreen> {
           child: AspectRatio(
             aspectRatio: 16 / 9,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(12),
               child: Stack(fit: StackFit.expand, children: [
                 Container(color: kCard),
                 netImg(img),
-                const Center(child: Icon(Icons.play_circle_outline, size: 34, color: Colors.white70)),
                 if (pr > 0 && pr < 100)
-                  Align(
-                    alignment: Alignment.bottomLeft,
-                    child: FractionallySizedBox(
-                        widthFactor: pr / 100, child: Container(height: 3, color: const Color(0xFF4DA6FF))),
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                    height: 4,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(value: pr / 100, color: kBlue, backgroundColor: const Color(0x40FFFFFF)),
+                    ),
                   ),
               ]),
             ),
@@ -494,11 +512,11 @@ class _DetailScreenState extends State<DetailScreen> {
             Text('${e['IndexNumber'] ?? ''}. ${e['Name'] ?? ''}',
                 maxLines: 2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             const SizedBox(height: 3),
-            Text([rt(e['RunTimeTicks']), if (ud['Played'] == true) 'İzlendi ✓'].where((s) => s.isNotEmpty).join(' • '),
+            Text([rt(e['RunTimeTicks']), if (ud['Played'] == true) 'İzlendi ✓'].where((s) => s.isNotEmpty).join(' · '),
                 style: const TextStyle(color: kMuted, fontSize: 12)),
             const SizedBox(height: 4),
             Text('${e['Overview'] ?? ''}',
-                maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFCFD5EA), height: 1.4)),
+                maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0x99F5F5F7), height: 1.4)),
           ]),
         ),
         _epDl(c, e),
