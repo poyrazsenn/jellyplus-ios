@@ -3,5 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['layout', 'Yeni Profil ekranı', 'iPhone Ayarlar uygulaması gibi büyük başlık, renkli simgeli gruplar ve iOS anahtarları. Altyazı dili ve görünümü kendi sayfalarında; görünüm sayfasında canlı önizleme ve iOS seçiciler.'],
+  ['library', 'iOS kütüphane sayfaları', 'Filmler, Diziler ve Listem büyük iOS başlığıyla açılıyor. Hepsi / Film / Dizi seçimi iOS segment düğmesi, sıralama iOS menüsünden seçiliyor.'],
+  ['request', 'iPhone gibi yenileme', 'Aşağı çekince Android çarkı yerine iOS\'un kendi göstergesi çıkıyor (ana sayfa, kütüphaneler, istekler).'],
 ];

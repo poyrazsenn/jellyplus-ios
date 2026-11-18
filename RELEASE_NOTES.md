@@ -1,7 +1,13 @@
-## Poyraz Player 3.0 — beta 2
+## Poyraz Player 3.0 — beta 3
 
 **Yenilikler**
-- **Yeni Profil ekranı:** iPhone Ayarlar uygulaması gibi büyük başlık, renkli simgeli gruplar ve iOS anahtarları. Altyazı dili ve görünümü kendi sayfalarında; görünüm sayfasında canlı önizleme ve iOS seçiciler.
+
+- **iOS kütüphane sayfaları:** Filmler, Diziler ve Listem büyük iOS başlığıyla açılıyor. Hepsi / Film / Dizi seçimi iOS segment düğmesi, sıralama iOS menüsünden seçiliyor.
+- **iPhone gibi yenileme:** Aşağı çekince Android çarkı yerine iOS'un kendi göstergesi çıkıyor (ana sayfa, kütüphaneler, istekler).
+
+**Beta 2'de gelenler**
+
+- Yeni Profil ekranı: iOS Ayarlar düzeni, anahtarlar ve alt sayfalar.
 
 **Beta 1'de gelenler**
 - **Yeni isim ve logo:** Jelly+ artık Poyraz Player; yeni P + oynat simgesi.

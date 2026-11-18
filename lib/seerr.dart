@@ -270,7 +270,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
           ? ErrorView(err, retry: load)
           : l == null
               ? const Loading()
-              : RefreshIndicator(
+              : RefreshIndicator.adaptive(
                   onRefresh: load,
                   child: l.isEmpty
                       ? ListView(children: const [

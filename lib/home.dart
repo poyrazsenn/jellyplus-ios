@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
@@ -124,9 +125,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ? const Loading()
           : err.isNotEmpty
               ? ErrorView(err, retry: load)
-              : RefreshIndicator(
-                  onRefresh: () => load(silent: true),
-                  child: CustomScrollView(slivers: [
+              : CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  slivers: [
                     SliverToBoxAdapter(
                       child: Stack(children: [
                         HeroCarousel(feat),
@@ -159,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ]),
                     ),
+                    CupertinoSliverRefreshControl(onRefresh: () => load(silent: true)),
                     // kütüphaneler + stüdyolar (Disney/Pixar/Marvel kutuları gibi)
                     if (libs.isNotEmpty || studios.isNotEmpty)
                       SliverToBoxAdapter(
@@ -202,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       SliverToBoxAdapter(child: Shelf('Yeni eklenenler: ${libs[i]['Name']}', lat[i])),
                     SliverToBoxAdapter(child: Shelf('Koleksiyonlar', cols)),
                     const SliverToBoxAdapter(child: SizedBox(height: 30)),
-                  ]),
+                  ],
                 ),
     );
   }

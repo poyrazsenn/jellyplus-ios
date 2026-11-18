@@ -64,7 +64,7 @@ class JellyPlus extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: kBg,
-        colorScheme: const ColorScheme.dark(primary: kBlue, surface: kSheet),
+        colorScheme: const ColorScheme.dark(primary: kBlue, onPrimary: kInk, secondary: kBlue, onSecondary: kInk, secondaryContainer: kBlue, onSecondaryContainer: kInk, surface: kSheet),
         appBarTheme: const AppBarTheme(
           backgroundColor: kBg,
           elevation: 0,
@@ -106,7 +106,7 @@ class JellyPlus extends StatelessWidget {
         progressIndicatorTheme: const ProgressIndicatorThemeData(color: Colors.white),
         dividerTheme: const DividerThemeData(color: Color(0x14FFFFFF)),
         listTileTheme: const ListTileThemeData(iconColor: Color(0xCCF5F5F7)),
-        chipTheme: const ChipThemeData(shape: StadiumBorder(), side: BorderSide(color: Colors.white24)),
+        chipTheme: const ChipThemeData(shape: StadiumBorder(), side: BorderSide(color: Colors.white24), showCheckmark: false, selectedColor: kBlue, secondaryLabelStyle: TextStyle(color: kInk, fontWeight: FontWeight.w600)),
       ),
       home: start,
     );

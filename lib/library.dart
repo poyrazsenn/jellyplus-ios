@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'scan.dart';
@@ -82,91 +84,133 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
-  Widget chip(String label, bool sel, VoidCallback onTap) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(label: Text(label), selected: sel, onSelected: (_) => onTap()),
-      );
+  Future<void> _sortSheet() async {
+    HapticFeedback.selectionClick();
+    final v = await showCupertinoModalPopup<String>(
+      context: context,
+      builder: (c) => CupertinoActionSheet(
+        title: const Text('Sırala'),
+        actions: [
+          for (final e in sorts.entries)
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(c, e.key),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text(e.value, style: TextStyle(fontWeight: e.key == sort ? FontWeight.w600 : FontWeight.w400)),
+                if (e.key == sort) ...[const SizedBox(width: 8), const Icon(CupertinoIcons.checkmark_alt, size: 18)],
+              ]),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(isDefaultAction: true, onPressed: () => Navigator.pop(c), child: const Text('Vazgeç')),
+      ),
+    );
+    if (v != null && v != sort) {
+      sort = v;
+      load(true);
+    }
+  }
+
+  Future<void> _scan() async {
+    final id = RegExp(r'ParentId=([0-9a-f]+)').firstMatch(widget.extra)!.group(1)!;
+    final ok = await Scanner.I.scanOne(id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? 'Tarama başladı. Yeni dosyalar birkaç dakika içinde görünür.' : 'Tarama başlatılamadı.')));
+    if (ok) {
+      Future.delayed(const Duration(seconds: 25), () {
+        if (mounted) load(true);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
     final pad = hPad(context);
     final cols = w > 1000 ? 4 : (w > 700 ? 3 : 2);
+    final canScan = Api.I.admin && RegExp(r'ParentId=([0-9a-f]+)').hasMatch(widget.extra);
+    final seg = type.isEmpty ? 0 : (type == 'Movie' ? 1 : 2);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        automaticallyImplyLeading: !widget.root,
-        actions: [
-          if (Api.I.admin && RegExp(r'ParentId=([0-9a-f]+)').hasMatch(widget.extra))
-            IconButton(
-              tooltip: 'Bu kütüphaneyi tara',
-              icon: const Icon(Icons.manage_search),
-              onPressed: () async {
-                final id = RegExp(r'ParentId=([0-9a-f]+)').firstMatch(widget.extra)!.group(1)!;
-                final ok = await Scanner.I.scanOne(id);
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(ok
-                        ? 'Tarama başladı. Yeni dosyalar birkaç dakika içinde görünür.'
-                        : 'Tarama başlatılamadı.')));
-                if (ok) {
-                  Future.delayed(const Duration(seconds: 25), () {
-                    if (mounted) load(true);
-                  });
-                }
-              },
-            ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () => load(true),
-        child: CustomScrollView(controller: sc, physics: const AlwaysScrollableScrollPhysics(), slivers: [
+      backgroundColor: kBg,
+      body: CustomScrollView(
+        controller: sc,
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          CupertinoSliverNavigationBar(
+            largeTitle: Text(widget.title, style: const TextStyle(color: Color(0xFFF5F5F7))),
+            backgroundColor: const Color(0xCC0B0B0D),
+            border: null,
+            automaticallyImplyLeading: !widget.root,
+            previousPageTitle: widget.root ? null : 'Geri',
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (canScan) ...[
+                GlassIcon(Icons.manage_search_rounded, size: 34, tooltip: 'Bu kütüphaneyi tara', onTap: _scan),
+                const SizedBox(width: 8),
+              ],
+              GlassIcon(CupertinoIcons.arrow_up_arrow_down, size: 34, tooltip: 'Sırala: ${sorts[sort]}', onTap: _sortSheet),
+            ]),
+          ),
+          CupertinoSliverRefreshControl(onRefresh: () => load(true)),
           SliverToBoxAdapter(
-            child: SizedBox(
-              height: 52,
-              child: ListView(scrollDirection: Axis.horizontal, padding: EdgeInsets.symmetric(horizontal: pad, vertical: 6), children: [
-                PopupMenuButton<String>(
-                  initialValue: sort,
-                  onSelected: (v) {
-                    sort = v;
-                    load(true);
-                  },
-                  itemBuilder: (_) => [for (final e in sorts.entries) PopupMenuItem(value: e.key, child: Text(e.value))],
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(border: Border.all(color: Colors.white30), borderRadius: BorderRadius.circular(8)),
-                    child: Row(children: [
-                      const Icon(Icons.sort, size: 18),
-                      const SizedBox(width: 6),
-                      Text(sorts[sort]!),
-                    ]),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(pad, 4, pad, 6),
+              child: Row(children: [
+                Expanded(
+                  child: CupertinoSlidingSegmentedControl<int>(
+                    groupValue: seg,
+                    backgroundColor: const Color(0x1FFFFFFF),
+                    thumbColor: const Color(0xFF636366),
+                    children: const {
+                      0: Padding(padding: EdgeInsets.symmetric(vertical: 7), child: Text('Hepsi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFF5F5F7)))),
+                      1: Padding(padding: EdgeInsets.symmetric(vertical: 7), child: Text('Film', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFF5F5F7)))),
+                      2: Padding(padding: EdgeInsets.symmetric(vertical: 7), child: Text('Dizi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFF5F5F7)))),
+                    },
+                    onValueChanged: (v) {
+                      if (v == null) return;
+                      HapticFeedback.selectionClick();
+                      type = const ['', 'Movie', 'Series'][v];
+                      load(true);
+                    },
                   ),
                 ),
-                chip('Hepsi', type.isEmpty, () {
-                  type = '';
-                  load(true);
-                }),
-                chip('Film', type == 'Movie', () {
-                  type = 'Movie';
-                  load(true);
-                }),
-                chip('Dizi', type == 'Series', () {
-                  type = 'Series';
-                  load(true);
-                }),
-                chip('İzlemediklerim', unplayed, () {
-                  unplayed = !unplayed;
-                  load(true);
-                }),
+                const SizedBox(width: 10),
+                Semantics(
+                  button: true,
+                  selected: unplayed,
+                  label: 'İzlemediklerim',
+                  child: Pressable(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      unplayed = !unplayed;
+                      load(true);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 34,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: unplayed ? kBlue : const Color(0x1FFFFFFF),
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(unplayed ? CupertinoIcons.eye_slash_fill : CupertinoIcons.eye_slash,
+                            size: 15, color: unplayed ? kInk : const Color(0xFFF5F5F7)),
+                        const SizedBox(width: 6),
+                        Text('İzlemediklerim',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: unplayed ? kInk : const Color(0xFFF5F5F7))),
+                      ]),
+                    ),
+                  ),
+                ),
               ]),
             ),
           ),
           if (!first && err.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(pad, 4, pad, 8),
-                child: Text(total > 0 ? '$total sonuç' : 'Sonuç yok.', style: const TextStyle(color: kMuted, fontSize: 13)),
+                padding: EdgeInsets.fromLTRB(pad + 2, 6, pad, 10),
+                child: Text(total > 0 ? '$total içerik · ${sorts[sort]}' : 'Sonuç yok.',
+                    style: const TextStyle(color: Color(0x8CF5F5F7), fontSize: 13)),
               ),
             ),
           if (err.isNotEmpty) SliverFillRemaining(hasScrollBody: false, child: ErrorView(err, retry: () => load(true))),
@@ -183,9 +227,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           SliverToBoxAdapter(
-            child: SizedBox(height: 60, child: loading && !first ? const Loading() : null),
+            child: SizedBox(height: widget.root ? 130 : 60, child: loading && !first ? const Center(child: CupertinoActivityIndicator()) : null),
           ),
-        ]),
+        ],
       ),
     );
   }
