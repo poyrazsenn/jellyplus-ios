@@ -11,6 +11,7 @@ import 'downloads.dart';
 import 'downloads_screen.dart';
 import 'home.dart';
 import 'library.dart';
+import 'nav.dart';
 import 'player.dart' show subtitleText;
 import 'scan.dart';
 import 'search.dart';
@@ -56,14 +57,54 @@ class JellyPlus extends StatelessWidget {
       start = const LoginScreen();
     }
     return MaterialApp(
-      title: 'Jelly+',
+      title: 'Poyraz Player',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: kBg,
-        colorScheme: const ColorScheme.dark(primary: kBlue, surface: Color(0xFF0E1328)),
-        appBarTheme: const AppBarTheme(backgroundColor: kBg, elevation: 0, scrolledUnderElevation: 0),
+        colorScheme: const ColorScheme.dark(primary: kBlue, surface: kSheet),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: kBg,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFFF5F5F7)),
+        ),
         useMaterial3: true,
+        // iOS hissi: dalga efekti yok, iOS sayfa geçişleri, yuvarlak sayfalar, kapsül düğmeler
+        splashFactory: NoSplash.splashFactory,
+        highlightColor: const Color(0x14FFFFFF),
+        canvasColor: kBg,
+        pageTransitionsTheme: const PageTransitionsTheme(builders: {
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        }),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: kSheet,
+          modalBackgroundColor: kSheet,
+          showDragHandle: true,
+          dragHandleColor: Color(0x4DF5F5F7),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF2A2A30),
+          contentTextStyle: const TextStyle(color: Color(0xFFF5F5F7), fontSize: 14),
+          actionTextColor: kAccent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(backgroundColor: kBlue, foregroundColor: kInk, shape: const StadiumBorder()),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white, side: const BorderSide(color: Colors.white24), shape: const StadiumBorder()),
+        ),
+        textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: Colors.white)),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(color: Colors.white),
+        dividerTheme: const DividerThemeData(color: Color(0x14FFFFFF)),
+        listTileTheme: const ListTileThemeData(iconColor: Color(0xCCF5F5F7)),
+        chipTheme: const ChipThemeData(shape: StadiumBorder(), side: BorderSide(color: Colors.white24)),
       ),
       home: start,
     );
@@ -135,11 +176,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: FilledButton.styleFrom(
                       backgroundColor: kBlue,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                      shape: const StadiumBorder()),
                   onPressed: busy ? null : go,
                   child: busy
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('GİRİŞ YAP', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.4, color: Colors.white)),
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kInk))
+                      : const Text('Giriş yap', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: kInk)),
                 ),
               ]),
             ),
@@ -294,6 +335,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    tabBus.addListener(_onTabBus);
     // Netflix gibi: internet kesildiği an İndirilenler'e geç
     Connectivity().checkConnectivity().then((r) {
       if (_isOff(r)) _goOffline();
@@ -323,9 +365,81 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     });
   }
 
+  void _goTab(int i) {
+    if (i == tab) {
+      keys[i].currentState?.popUntil((r) => r.isFirst);
+    } else {
+      ThemeMusic.I.stop();
+      setState(() => tab = i);
+    }
+  }
+
+  void _onTabBus() {
+    final t = tabBus.value;
+    if (t == null) return;
+    tabBus.value = null;
+    _goTab(t);
+  }
+
+  /// A · Cam: ekranın altında havada duran buğulu cam şerit. Profil sağ üstteki düğmeden açılır.
+  Widget _glassBar(BuildContext context) {
+    const items = [
+      [Icons.home_outlined, Icons.home_rounded, 'Ana sayfa'],
+      [Icons.search_rounded, Icons.search_rounded, 'Ara'],
+      [Icons.bookmark_border_rounded, Icons.bookmark_rounded, 'Listem'],
+      [Icons.download_outlined, Icons.download_rounded, 'İndirilenler'],
+    ];
+    final wide = MediaQuery.sizeOf(context).width > 700;
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 10),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: wide ? 460 : 420),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+            child: Glass(
+              radius: 32,
+              color: const Color(0xC726262C),
+              child: SizedBox(
+                height: 62,
+                child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                  for (var i = 0; i < items.length; i++)
+                    Semantics(
+                      button: true,
+                      selected: tab == i,
+                      label: items[i][2] as String,
+                      child: Pressable(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          _goTab(i);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 58,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: tab == i ? Colors.white.withAlpha(42) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Icon((tab == i ? items[i][1] : items[i][0]) as IconData,
+                              size: 25, color: tab == i ? Colors.white : const Color(0x99F5F5F7)),
+                        ),
+                      ),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    tabBus.removeListener(_onTabBus);
     _net?.cancel();
     super.dispose();
   }
@@ -390,8 +504,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             child: offline
                 ? Container(
                     width: double.infinity,
-                    color: const Color(0xFF2A2F3D),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.fromLTRB(20, 0, 20, 2),
+                    decoration: BoxDecoration(color: const Color(0xFF26262C), borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     child: Row(children: [
                       const Icon(Icons.cloud_off, size: 16, color: Colors.white70),
                       const SizedBox(width: 8),
@@ -404,36 +519,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   )
                 : const SizedBox(width: double.infinity),
           ),
-          Theme(
-          data: Theme.of(context).copyWith(splashColor: Colors.transparent, highlightColor: Colors.transparent),
-          child: BottomNavigationBar(
-            currentIndex: tab,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: kBar,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: const Color(0xFF8A93AE),
-            selectedFontSize: 11,
-            unselectedFontSize: 11,
-            onTap: (i) {
-              if (i == tab) {
-                keys[i].currentState?.popUntil((r) => r.isFirst);
-              } else {
-                ThemeMusic.I.stop();
-                setState(() => tab = i);
-              }
-            },
-            items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Ana sayfa'),
-              BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Ara'),
-              BottomNavigationBarItem(icon: Icon(Icons.add), activeIcon: Icon(Icons.check), label: 'Listem'),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.download_for_offline_outlined),
-                  activeIcon: Icon(Icons.download_for_offline),
-                  label: 'İndirilenler'),
-              BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
-            ],
-          ),
-        ),
+          _glassBar(context),
         ]),
       ),
     );
@@ -470,7 +556,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> chooseLang() async {
     final v = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF0E1328),
+      backgroundColor: kSheet,
       builder: (c) => SafeArea(
         child: ListView(shrinkWrap: true, children: [
           const Padding(
@@ -513,13 +599,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(
+        title: const Text('Profil'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GlassIcon(Icons.close_rounded, size: 34, tooltip: 'Kapat', onTap: () => tabBus.value = 0),
+          ),
+        ],
+      ),
       body: ListView(children: [
         ListTile(
           leading: CircleAvatar(
             backgroundColor: kBlue,
             child: Text(api.name.isEmpty ? '?' : api.name[0].toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                style: const TextStyle(color: kInk, fontWeight: FontWeight.w700)),
           ),
           title: Text(api.name, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(api.url, style: const TextStyle(color: kMuted)),
@@ -553,13 +647,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (v) => setState(() => api.subSize = v),
           ),
         ),
-        SwitchListTile(
+        SwitchListTile.adaptive(
           secondary: const Icon(Icons.fast_forward_outlined),
           title: const Text('Giriş ve jeneriği otomatik atla'),
           value: api.autoSkip,
           onChanged: (v) => setState(() => api.autoSkip = v),
         ),
-        SwitchListTile(
+        SwitchListTile.adaptive(
           secondary: const Icon(Icons.skip_next_outlined),
           title: const Text('Sonraki bölümü otomatik başlat'),
           subtitle: const Text('Jenerikte 10 saniyelik geri sayım', style: TextStyle(color: kMuted)),
@@ -585,14 +679,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const ScanTile(),
         ],
         _head('İNDİRMELER'),
-        SwitchListTile(
+        SwitchListTile.adaptive(
           secondary: const Icon(Icons.auto_delete_outlined),
           title: const Text('İzleyince sil'),
           subtitle: const Text('İzlenen indirmeler oynatıcı kapanınca silinir', style: TextStyle(color: kMuted)),
           value: Downloads.I.autoDelete,
           onChanged: (v) => setState(() => Downloads.I.autoDelete = v),
         ),
-        SwitchListTile(
+        SwitchListTile.adaptive(
           secondary: const Icon(Icons.cloud_download_outlined),
           title: const Text('Arka planda indir'),
           subtitle: const Text('Telefon kilitliyken ve uygulama kapalıyken de sürer. Sorun olursa kapat; 2.0\'daki gibi uygulama açıkken iner.',
@@ -633,7 +727,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           },
         ),
         const SizedBox(height: 20),
-        const Center(child: Text('Jelly+ iOS $kVersion', style: TextStyle(color: kMuted, fontSize: 12))),
+        const Center(child: Text('Poyraz Player $kVersion', style: TextStyle(color: kMuted, fontSize: 12))),
         const SizedBox(height: 30),
       ]),
     );

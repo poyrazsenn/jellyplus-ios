@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
@@ -169,12 +170,13 @@ class _DetailScreenState extends State<DetailScreen> {
     ];
     final fav = x['UserData']?['IsFavorite'] == true;
     final seen = x['UserData']?['Played'] == true;
-    final heroH = w > 700 ? w * .5 : w * .78;
+    final heroH = w > 700 ? w * .5 : w * 1.02;
 
     String playLabel() {
-      if (!res) return isSeries && p['IndexNumber'] != null ? 'OYNAT  S${p['ParentIndexNumber']}:B${p['IndexNumber']}' : 'OYNAT';
+      if (!res) return isSeries && p['IndexNumber'] != null ? 'Oynat · S${p['ParentIndexNumber']} B${p['IndexNumber']}' : 'Oynat';
       final left = ((p['RunTimeTicks'] as num?) ?? 0) - resTicks;
-      return 'DEVAM ET${left > 0 ? '  •  ${rt(left)} kaldı' : ''}';
+      final ep = isSeries && p['IndexNumber'] != null ? ' · S${p['ParentIndexNumber']} B${p['IndexNumber']}' : '';
+      return 'Devam et$ep${left > 0 ? ' · ${rt(left)} kaldı' : ''}';
     }
 
     return Scaffold(
@@ -189,35 +191,25 @@ class _DetailScreenState extends State<DetailScreen> {
                   gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0x66040714), Color(0x00040714), Color(0xCC040714), kBg],
+                      colors: [Color(0x660B0B0D), Color(0x000B0B0D), Color(0xCC0B0B0D), kBg],
                       stops: [0, .3, .78, 1]),
                 ),
               ),
               Positioned(
-                top: MediaQuery.paddingOf(context).top + 6,
-                left: 10,
-                child: CircleAvatar(
-                  backgroundColor: Colors.black54,
-                  child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.of(context).maybePop()),
-                ),
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: 14,
+                child: GlassIcon(Icons.arrow_back_ios_new_rounded,
+                    tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
               ),
               if (hasTheme)
                 Positioned(
-                  top: MediaQuery.paddingOf(context).top + 6,
-                  right: 10,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.black54,
-                    child: IconButton(
-                      tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç',
-                      icon: Icon(api.themeOn ? Icons.volume_up : Icons.volume_off, color: Colors.white),
-                      onPressed: () {
-                        setState(() => api.themeOn = !api.themeOn);
-                        api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
-                      },
-                    ),
-                  ),
+                  top: MediaQuery.paddingOf(context).top + 8,
+                  right: 14,
+                  child: GlassIcon(api.themeOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                      tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç', onTap: () {
+                    setState(() => api.themeOn = !api.themeOn);
+                    api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
+                  }),
                 ),
               Positioned(
                 left: pad,
@@ -252,20 +244,8 @@ class _DetailScreenState extends State<DetailScreen> {
             if (genres.isNotEmpty)
               Padding(padding: const EdgeInsets.only(top: 6), child: Text(genres, style: const TextStyle(fontSize: 13))),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 50,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFF9F9F9),
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                onPressed: () async {
-                  await openPlayer(context, p);
-                },
-                icon: const Icon(Icons.play_arrow, size: 28),
-                label: Text(playLabel(), style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.4)),
-              ),
-            ),
+            PillButton(playLabel(),
+                icon: Icons.play_arrow_rounded, height: 52, expand: true, onTap: () => openPlayer(context, p)),
             if (res && ((p['RunTimeTicks'] as num?) ?? 0) > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -275,12 +255,12 @@ class _DetailScreenState extends State<DetailScreen> {
                     value: (resTicks / (p['RunTimeTicks'] as num)).clamp(0, 1).toDouble(),
                     minHeight: 3,
                     backgroundColor: Colors.white24,
-                    color: const Color(0xFF4DA6FF),
+                    color: Colors.white,
                   ),
                 ),
               ),
             const SizedBox(height: 12),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+            Row(children: [
               _act(fav ? Icons.check : Icons.add, 'Listem', () => flag('fav', !fav)),
               if (tr != null)
                 _act(Icons.movie_creation_outlined, 'Fragman',
@@ -302,31 +282,36 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
               ),
             const SizedBox(height: 14),
-            // sekmeler
+            // sekmeler: iOS bölümlü seçici
             Container(
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white24, width: 1.5))),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: [
-                  for (final t in tabs)
-                    GestureDetector(
-                      onTap: () => setState(() => tab = t[0]),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 26),
-                        padding: const EdgeInsets.fromLTRB(0, 14, 0, 9),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                for (final t in tabs)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => tab = t[0]);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        height: 34,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
-                            border: Border(
-                                bottom: BorderSide(color: tab == t[0] ? Colors.white : Colors.transparent, width: 3))),
-                        child: Text(t[1].toUpperCase(),
+                          color: tab == t[0] ? Colors.white.withAlpha(46) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(t[1],
+                            maxLines: 1,
                             style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 1.5,
-                                color: tab == t[0] ? Colors.white : Colors.white60)),
+                                fontWeight: tab == t[0] ? FontWeight.w600 : FontWeight.w500,
+                                color: tab == t[0] ? Colors.white : const Color(0xA6F5F5F7))),
                       ),
                     ),
-                ]),
-              ),
+                  ),
+              ]),
             ),
             const SizedBox(height: 14),
           ]),
@@ -350,31 +335,43 @@ class _DetailScreenState extends State<DetailScreen> {
     return _act(b.icon, b.label, () => d == null ? askDownload(context, [v]) : dlActions(context, d), frac: b.frac);
   }
 
-  Widget _act(IconData i, String label, VoidCallback onTap, {double? frac}) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+  /// A · Cam: cam kare eylem kutusu (Listem, İndir, Fragman…)
+  Widget _act(IconData i, String label, VoidCallback onTap, {double? frac}) => Expanded(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            SizedBox(
-              width: 42,
-              height: 42,
-              child: Stack(alignment: Alignment.center, children: [
-                Container(
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black54,
-                      border: Border.all(color: frac != null ? Colors.white24 : Colors.white, width: 2)),
-                  child: Center(child: Icon(i, size: 22)),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Semantics(
+            button: true,
+            label: label,
+            child: Pressable(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onTap();
+              },
+              child: Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(20),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withAlpha(26)),
                 ),
-                if (frac != null)
-                  SizedBox.expand(
-                      child: CircularProgressIndicator(value: frac == 0 ? null : frac, strokeWidth: 2.5, color: kBlue)),
-              ]),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Stack(alignment: Alignment.center, children: [
+                      Icon(i, size: frac != null ? 14 : 21),
+                      if (frac != null)
+                        SizedBox.expand(
+                            child: CircularProgressIndicator(
+                                value: frac == 0 ? null : frac, strokeWidth: 2, color: Colors.white)),
+                    ]),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                ]),
+              ),
             ),
-            const SizedBox(height: 5),
-            Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFFCFD5EA))),
-          ]),
+          ),
         ),
       );
 

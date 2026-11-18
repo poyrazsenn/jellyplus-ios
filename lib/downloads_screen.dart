@@ -14,7 +14,7 @@ Future<void> askDownload(BuildContext context, List<J> items, {String? title}) a
   final orig = dl.sizeOf(items, 'orig'), small = dl.sizeOf(items, 'small');
   final q = await showModalBottomSheet<String>(
     context: context,
-    backgroundColor: const Color(0xFF0E1328),
+    backgroundColor: kSheet,
     builder: (c) {
       Widget opt(String k, IconData i, String t, String sub) => ListTile(
             leading: Icon(i),
@@ -76,7 +76,7 @@ Future<void> dlActions(BuildContext context, Dl d) async {
   final dl = Downloads.I;
   final a = await showModalBottomSheet<String>(
     context: context,
-    backgroundColor: const Color(0xFF0E1328),
+    backgroundColor: kSheet,
     builder: (c) => SafeArea(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         ListTile(
@@ -180,7 +180,7 @@ class DownloadsScreen extends StatelessWidget {
                     style: const TextStyle(color: kMuted, fontSize: 13)),
               ),
               const Text('İzleyince sil', style: TextStyle(fontSize: 13)),
-              Switch(value: dl.autoDelete, onChanged: (v) => dl.autoDelete = v),
+              Switch.adaptive(value: dl.autoDelete, onChanged: (v) => dl.autoDelete = v),
             ]),
             if (movies.isNotEmpty) _head('Filmler'),
             for (final d in movies) _DlTile(d),

@@ -197,11 +197,11 @@ class _SeerrResultTileState extends State<SeerrResultTile> {
         const SizedBox(width: 8),
         if (st <= 1)
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kBlue, padding: const EdgeInsets.symmetric(horizontal: 16)),
+            style: FilledButton.styleFrom(backgroundColor: kBlue, shape: const StadiumBorder(), padding: const EdgeInsets.symmetric(horizontal: 16)),
             onPressed: busy ? null : ask,
             child: busy
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('İste', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: kInk))
+                : const Text('İste', style: TextStyle(color: kInk, fontWeight: FontWeight.w700)),
           )
         else
           Text(s.text, style: TextStyle(color: s.color, fontWeight: FontWeight.w600, fontSize: 12)),
@@ -399,8 +399,8 @@ class _SeerrSettingsScreenState extends State<SeerrSettingsScreen> {
           onPressed: busy ? null : save,
           style: FilledButton.styleFrom(backgroundColor: kBlue, padding: const EdgeInsets.symmetric(vertical: 14)),
           child: busy
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Kaydet ve dene', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kInk))
+              : const Text('Kaydet ve dene', style: TextStyle(color: kInk, fontWeight: FontWeight.w700)),
         ),
         if (msg.isNotEmpty)
           Padding(

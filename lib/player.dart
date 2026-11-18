@@ -652,7 +652,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xF20B1024),
+      backgroundColor: kSheet,
       constraints: BoxConstraints(maxWidth: 720, maxHeight: MediaQuery.sizeOf(context).height * .9),
       builder: (c) => SafeArea(
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -733,7 +733,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 subtitle: Text(_info(), style: const TextStyle(color: kMuted, fontSize: 11)),
               ),
               head('OTOMATİK ATLA'),
-              SwitchListTile(
+              SwitchListTile.adaptive(
                 dense: true,
                 title: const Text('Giriş ve jeneriği otomatik atla'),
                 value: api.autoSkip,
@@ -768,7 +768,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xF20B1024),
+      backgroundColor: kSheet,
       constraints: BoxConstraints(maxWidth: 760, maxHeight: MediaQuery.sizeOf(context).height * .92),
       builder: (c) => StatefulBuilder(builder: (c, set) {
         Future<void> search() async {
@@ -917,7 +917,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xF20B1024),
+      backgroundColor: kSheet,
       constraints: BoxConstraints(maxWidth: 720, maxHeight: MediaQuery.sizeOf(context).height * .9),
       builder: (c) => SafeArea(
         child: ListView.builder(

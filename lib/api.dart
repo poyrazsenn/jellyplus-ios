@@ -103,7 +103,7 @@ class Api {
 
   // ---------- HTTP ----------
   String get _auth =>
-      'MediaBrowser Client="Jelly+ iOS", Device="iPhone", DeviceId="$deviceId", Version="$kVersion"'
+      'MediaBrowser Client="Poyraz Player", Device="iPhone", DeviceId="$deviceId", Version="$kVersion"'
       '${token.isNotEmpty ? ', Token="$token"' : ''}';
 
   Map<String, String> get headers =>

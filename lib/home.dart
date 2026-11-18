@@ -119,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pad = hPad(context);
     final tw = cardWidth(context);
     return Scaffold(
+      extendBodyBehindAppBar: true,
       body: loading
           ? const Loading()
           : err.isNotEmpty
@@ -126,14 +127,38 @@ class _HomeScreenState extends State<HomeScreen> {
               : RefreshIndicator(
                   onRefresh: () => load(silent: true),
                   child: CustomScrollView(slivers: [
-                    SliverAppBar(
-                      floating: true,
-                      snap: true,
-                      backgroundColor: const Color(0xEB040714),
-                      title: const Logo(),
-                      centerTitle: false,
+                    SliverToBoxAdapter(
+                      child: Stack(children: [
+                        HeroCarousel(feat),
+                        Positioned(
+                          left: pad + 4,
+                          right: pad,
+                          top: MediaQuery.paddingOf(context).top + 10,
+                          child: Row(children: [
+                            const Logo(size: 21),
+                            const Spacer(),
+                            Semantics(
+                              button: true,
+                              label: 'Profil',
+                              child: Pressable(
+                                onTap: () => tabBus.value = 4,
+                                child: Glass(
+                                  radius: 19,
+                                  child: SizedBox(
+                                    width: 38,
+                                    height: 38,
+                                    child: Center(
+                                      child: Text(api.name.isEmpty ? '?' : api.name[0].toUpperCase(),
+                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ]),
                     ),
-                    SliverToBoxAdapter(child: HeroCarousel(feat)),
                     // kütüphaneler + stüdyolar (Disney/Pixar/Marvel kutuları gibi)
                     if (libs.isNotEmpty || studios.isNotEmpty)
                       SliverToBoxAdapter(

@@ -58,7 +58,7 @@ Future<void> showWhatsNew(BuildContext context, {bool force = false}) async {
   await showDialog(
     context: context,
     builder: (c) => AlertDialog(
-      backgroundColor: const Color(0xFF0E1328),
+      backgroundColor: kSheet,
       title: Text('Jelly+ $kVersion yenilikleri'),
       content: SizedBox(
         width: 420,
@@ -95,7 +95,7 @@ Future<void> checkUpdate(BuildContext context) async {
   await showDialog(
     context: context,
     builder: (c) => AlertDialog(
-      backgroundColor: const Color(0xFF0E1328),
+      backgroundColor: kSheet,
       title: const Text('Yeni sürüm var'),
       content: Text(
         'Jelly+ $latest çıktı (sende $kVersion).'
