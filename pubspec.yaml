@@ -1,7 +1,7 @@
 name: jellyplus
-description: Jelly+ — Jellyfin için Disney+ tarzı iOS istemcisi
+description: Poyraz Player — Jellyfin için iOS istemcisi
 publish_to: 'none'
-version: 2.1.1+22
+version: 3.0.0+30
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -21,6 +21,7 @@ dependencies:
   path_provider: ^2.1.4
   background_downloader: ^9.2.0
   connectivity_plus: ^6.1.0
+  screen_brightness: ^1.0.1
 
 dev_dependencies:
   flutter_launcher_icons: ^0.14.1

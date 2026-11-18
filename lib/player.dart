@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'api.dart';
@@ -58,6 +59,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? cdT; // sonraki bölüm geri sayımı
   int cd = 0;
   String? cdOff; // geri sayımı iptal edilen bölüm
+  // 3.0: bölüm şeridi, görüntü paneli, parlaklık
+  bool epsOpen = false, viewOpen = false, dragBright = false, hud = false, brightTouched = false;
+  num? epsSeason;
+  double? bright;
+  Timer? hudT;
+  final eq = <String, double>{'brightness': 0, 'contrast': 0, 'saturation': 0, 'gamma': 0};
+  static const _eqNames = {'brightness': 'Parlaklık', 'contrast': 'Kontrast', 'saturation': 'Doygunluk', 'gamma': 'Gama'};
   String sid = '';
   bool transcode = false, burn = false, closed = false, ready = false;
   int? audioIdx, subIdx, defAudio;
@@ -126,6 +134,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     repT?.cancel();
     ageT?.cancel();
     cdT?.cancel();
+    hudT?.cancel();
+    if (brightTouched) ScreenBrightness().resetScreenBrightness().catchError((_) {});
     for (final s in subs) {
       s.cancel();
     }
@@ -524,9 +534,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
         width: dw + 4,
         height: dh + 4,
         decoration: BoxDecoration(
-            color: Colors.black, border: Border.all(color: Colors.white, width: 2), borderRadius: BorderRadius.circular(4)),
+            color: Colors.black, border: Border.all(color: Colors.white54), borderRadius: BorderRadius.circular(12)),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(2),
+          borderRadius: BorderRadius.circular(11),
           child: OverflowBox(
             alignment: Alignment.topLeft,
             minWidth: 0,
@@ -976,7 +986,29 @@ class _PlayerScreenState extends State<PlayerScreen> {
       backgroundColor: Colors.black,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => ui ? setState(() => ui = false) : _showUI(),
+        onTap: () {
+          if (viewOpen) return setState(() => viewOpen = false);
+          ui ? setState(() => ui = false) : _showUI();
+        },
+        // solda yukarı/aşağı kaydır: ekran parlaklığı
+        onVerticalDragStart: (d) async {
+          if (d.localPosition.dx > MediaQuery.sizeOf(context).width / 2) return;
+          dragBright = true;
+          await _ensureBright();
+          if (mounted) setState(() => hud = true);
+        },
+        onVerticalDragUpdate: (d) {
+          if (!dragBright || bright == null) return;
+          _setBright(bright! - d.delta.dy / (MediaQuery.sizeOf(context).height * .7));
+          setState(() {});
+        },
+        onVerticalDragEnd: (_) {
+          dragBright = false;
+          hudT?.cancel();
+          hudT = Timer(const Duration(milliseconds: 900), () {
+            if (mounted) setState(() => hud = false);
+          });
+        },
         onDoubleTapDown: (d) => tapAt = d.localPosition,
         onDoubleTap: () => _seekBy(tapAt.dx < MediaQuery.sizeOf(context).width / 2 ? -10 : 10),
         child: Stack(children: [
@@ -998,7 +1030,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               bottom: (ui ? 110 : 30) + const [0.0, 50.0, 100.0][api.subLift.clamp(0, 2)],
               child: Center(child: subtitleText(cue)),
             ),
-          if (buffering && err.isEmpty) const Center(child: CircularProgressIndicator(color: Colors.white)),
+          if (buffering && err.isEmpty) const Center(child: CircularProgressIndicator.adaptive()),
           // yaş kartı
           if (i != null)
             Positioned(
@@ -1012,100 +1044,125 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
               ),
             ),
-          // kontroller
+          // kontroller (A · Cam)
           IgnorePointer(
             ignoring: !ui,
             child: AnimatedOpacity(
               opacity: ui ? 1 : 0,
               duration: const Duration(milliseconds: 250),
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xB3000000), Color(0x00000000), Color(0x00000000), Color(0xCC000000)],
-                    stops: [0, .25, .65, 1],
+                    colors: [
+                      const Color(0x99000000),
+                      const Color(0x33000000),
+                      const Color(0x33000000),
+                      epsOpen ? const Color(0xEB000000) : const Color(0xB3000000),
+                    ],
+                    stops: const [0, .3, .55, 1],
                   ),
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                     child: Column(children: [
                       Row(children: [
-                        IconButton(icon: const Icon(Icons.close, size: 28), onPressed: _close),
-                        const SizedBox(width: 6),
+                        GlassIcon(Icons.close_rounded, tooltip: 'Kapat', onTap: _close),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                             if (sub.isNotEmpty)
-                              Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFCFD5EA), fontSize: 13)),
+                              Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xB3F5F5F7), fontSize: 12)),
                           ]),
                         ),
-                        if (eps.length > 1) IconButton(icon: const Icon(Icons.video_library_outlined), tooltip: 'Bölümler', onPressed: _episodesSheet),
-                        IconButton(icon: const Icon(Icons.subtitles_outlined), tooltip: 'Ses ve altyazı', onPressed: _tracksSheet),
-                      ]),
-                      const Spacer(),
-                      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        IconButton(iconSize: 40, icon: const Icon(Icons.replay_10), onPressed: () => _seekBy(-10)),
-                        const SizedBox(width: 40),
-                        IconButton(
-                            iconSize: 64,
-                            icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                            onPressed: _togglePlay),
-                        const SizedBox(width: 40),
-                        IconButton(iconSize: 40, icon: const Icon(Icons.forward_10), onPressed: () => _seekBy(10)),
-                      ]),
-                      const Spacer(),
-                      LayoutBuilder(builder: (context, cs) => Stack(clipBehavior: Clip.none, children: [
-                      Row(children: [
-                        SizedBox(width: 62, child: Text(fmt(dragging ? Duration(milliseconds: (dragV * 1000).round()) : pos), style: const TextStyle(fontSize: 13))),
-                        Expanded(
-                          child: SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 3,
-                              activeTrackColor: Colors.white,
-                              inactiveTrackColor: Colors.white24,
-                              thumbColor: Colors.white,
-                              overlayShape: SliderComponentShape.noOverlay,
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                            ),
-                            child: Slider(
-                              value: curV.clamp(0, maxV).toDouble(),
-                              max: maxV,
-                              onChangeStart: (v) {
-                                hideT?.cancel();
-                                setState(() {
-                                  dragging = true;
-                                  dragV = v;
-                                });
-                              },
-                              onChanged: (v) => setState(() => dragV = v),
-                              onChangeEnd: (v) {
-                                player.seek(Duration(milliseconds: (v * 1000).round()));
-                                setState(() => dragging = false);
-                                _armHide();
-                              },
-                            ),
-                          ),
+                        Glass(
+                          radius: 24,
+                          padding: const EdgeInsets.all(4),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            if (epsOpen)
+                              _capBtn(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, playing ? 'Duraklat' : 'Oynat', _togglePlay),
+                            _capBtn(Icons.wb_sunny_outlined, 'Görüntü', _openView, on: viewOpen),
+                            _capBtn(Icons.subtitles_outlined, 'Ses ve altyazı', _tracksSheet),
+                            if (eps.length > 1) _capBtn(Icons.video_library_outlined, 'Bölümler', _toggleEps, on: epsOpen),
+                          ]),
                         ),
-                        SizedBox(
-                            width: 70,
-                            child: Text('-${fmt(dur - pos)}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
                       ]),
-                      if (dragging && tp != null)
-                        Positioned(
-                          bottom: 30,
-                          left: (62 + 7 + (dragV / maxV).clamp(0.0, 1.0) * (cs.maxWidth - 62 - 70 - 14) - 90)
-                              .clamp(0.0, max(0.0, cs.maxWidth - 180)),
-                          child: IgnorePointer(child: _thumb(dragV)),
-                        ),
-                    ])),
+                      Expanded(
+                        child: epsOpen
+                            ? const SizedBox()
+                            : Center(
+                                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                  _seekBtn(-10),
+                                  const SizedBox(width: 52),
+                                  Semantics(
+                                    button: true,
+                                    label: playing ? 'Duraklat' : 'Oynat',
+                                    child: Pressable(
+                                      haptic: true,
+                                      onTap: _togglePlay,
+                                      child: Glass(
+                                        radius: 42,
+                                        color: const Color(0x7326262C),
+                                        child: SizedBox(
+                                          width: 84,
+                                          height: 84,
+                                          child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 44, color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 52),
+                                  _seekBtn(10),
+                                ]),
+                              ),
+                      ),
+                      _scrubber(maxV, curV),
+                      if (epsOpen) _epsStrip(),
                     ]),
                   ),
                 ),
               ),
             ),
           ),
+          // parlaklık göstergesi (solda kaydırınca)
+          Positioned(
+            left: 40,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: hud ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Glass(
+                    radius: 26,
+                    child: SizedBox(
+                      width: 52,
+                      height: 190,
+                      child: Stack(children: [
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: FractionallySizedBox(
+                            heightFactor: (bright ?? .5).clamp(0.0, 1.0),
+                            widthFactor: 1,
+                            child: Container(color: const Color(0xE6F5F5F7)),
+                          ),
+                        ),
+                        const Align(
+                          alignment: Alignment(0, .82),
+                          child: Icon(Icons.wb_sunny_rounded, size: 22, color: Color(0xFF6B6B73)),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (viewOpen) _viewPanel(),
           // giriş atla / sonraki bölüm
           Positioned(
             right: 40,
@@ -1140,22 +1197,350 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  Widget _pill(String t, VoidCallback f, {bool primary = false}) => Material(
-        color: primary ? const Color(0xFFF9F9F9) : const Color(0xB3000000),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-            side: BorderSide(color: primary ? Colors.transparent : Colors.white70, width: 1.5)),
-        child: InkWell(
-          onTap: f,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            child: Text(t,
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, letterSpacing: .6, color: primary ? Colors.black : Colors.white)),
+  Widget _pill(String t, VoidCallback f, {bool primary = false}) => Pressable(
+        haptic: true,
+        onTap: f,
+        child: primary
+            ? Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: kBlue, borderRadius: BorderRadius.circular(21)),
+                child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: kInk)),
+              )
+            : Glass(
+                radius: 21,
+                color: const Color(0x9926262C),
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  alignment: Alignment.center,
+                  child: Text(t, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.white)),
+                ),
+              ),
+      );
+
+  // =================== 3.0 oynatıcı parçaları ===================
+  Widget _capBtn(IconData i, String label, VoidCallback f, {bool on = false}) => Semantics(
+        button: true,
+        label: label,
+        child: Pressable(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            f();
+          },
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: on ? kBlue : Colors.transparent, borderRadius: BorderRadius.circular(19)),
+            child: Icon(i, size: 20, color: on ? kInk : Colors.white),
           ),
         ),
       );
+
+  Widget _seekBtn(int s) => Semantics(
+        button: true,
+        label: s < 0 ? '10 saniye geri' : '10 saniye ileri',
+        child: Pressable(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            _seekBy(s);
+          },
+          child: SizedBox(
+            width: 56,
+            height: 56,
+            child: Icon(s < 0 ? Icons.replay_10_rounded : Icons.forward_10_rounded, size: 42, color: Colors.white),
+          ),
+        ),
+      );
+
+  Widget _scrubber(double maxV, double curV) => LayoutBuilder(
+        builder: (context, cs) => Stack(clipBehavior: Clip.none, children: [
+          Column(mainAxisSize: MainAxisSize.min, children: [
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: dragging ? 8 : 4,
+                activeTrackColor: Colors.white,
+                inactiveTrackColor: Colors.white24,
+                thumbColor: Colors.white,
+                overlayShape: SliderComponentShape.noOverlay,
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: dragging ? 9 : 5),
+              ),
+              child: Slider(
+                value: curV.clamp(0, maxV).toDouble(),
+                max: maxV,
+                onChangeStart: (v) {
+                  hideT?.cancel();
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    dragging = true;
+                    dragV = v;
+                  });
+                },
+                onChanged: (v) => setState(() => dragV = v),
+                onChangeEnd: (v) {
+                  player.seek(Duration(milliseconds: (v * 1000).round()));
+                  setState(() => dragging = false);
+                  _armHide();
+                },
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text(fmt(dragging ? Duration(milliseconds: (dragV * 1000).round()) : pos),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xCCF5F5F7))),
+              Text('-${fmt(dur - pos)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xCCF5F5F7))),
+            ]),
+          ]),
+          if (dragging && tp != null)
+            Positioned(
+              bottom: 40,
+              left: ((dragV / maxV).clamp(0.0, 1.0) * (cs.maxWidth - 24) + 12 - 90).clamp(0.0, max(0.0, cs.maxWidth - 180)),
+              child: IgnorePointer(child: _thumb(dragV)),
+            ),
+        ]),
+      );
+
+  void _toggleEps() {
+    hideT?.cancel();
+    setState(() {
+      epsOpen = !epsOpen;
+      epsSeason = null;
+    });
+    if (!epsOpen) _armHide();
+  }
+
+  Widget _epsStrip() {
+    final seasons = eps.map((e) => e['ParentIndexNumber'] as num?).toSet().toList();
+    final s = epsSeason ?? (it?['ParentIndexNumber'] as num?);
+    final list = eps.where((e) => e['ParentIndexNumber'] == s).toList();
+    return SizedBox(
+      height: 196,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 32,
+          child: ListView(scrollDirection: Axis.horizontal, children: [
+            for (final x in seasons)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Pressable(
+                  onTap: () => setState(() => epsSeason = x),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: x == s ? kBlue : Colors.white.withAlpha(26),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(x == null || x == 0 ? 'Özel' : '$x. Sezon',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: x == s ? kInk : Colors.white)),
+                  ),
+                ),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, k) {
+              final e = list[k];
+              final now = e['Id'] == it?['Id'];
+              final ud = (e['UserData'] as Map?) ?? const {};
+              final seen = ud['Played'] == true;
+              final run = (e['RunTimeTicks'] as num?) ?? 0;
+              final pt = (ud['PlaybackPositionTicks'] as num?) ?? 0;
+              final frac = now
+                  ? (dur.inMilliseconds > 0 ? pos.inMilliseconds / dur.inMilliseconds : 0.0)
+                  : (seen ? 1.0 : (run > 0 ? pt / run : 0.0));
+              final tag = (e['ImageTags'] as Map?)?['Primary'];
+              return Pressable(
+                onTap: () {
+                  if (now) return;
+                  setState(() => epsOpen = false);
+                  _start(e, restart: seen);
+                },
+                child: SizedBox(
+                  width: 176,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Container(
+                      width: 176,
+                      height: 99,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: kCard,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: now ? Colors.white : Colors.white12, width: now ? 2 : 1),
+                      ),
+                      child: Stack(fit: StackFit.expand, children: [
+                        if (tag != null) netImg(api.image('${e['Id']}', 'Primary', tag: '$tag', w: 360)),
+                        if (now)
+                          Positioned(
+                            left: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(color: kBlue, borderRadius: BorderRadius.circular(10)),
+                              child: const Text('Oynatılıyor', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kInk)),
+                            ),
+                          ),
+                        if (seen && !now)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(color: const Color(0xBF26262C), borderRadius: BorderRadius.circular(11)),
+                              child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                            ),
+                          ),
+                        Align(
+                          alignment: Alignment.bottomLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: frac.clamp(0.0, 1.0).toDouble(),
+                            child: Container(height: 3, color: Colors.white),
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 6),
+                    Text('${e['IndexNumber'] ?? ''}. ${e['Name'] ?? ''}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(rt(e['RunTimeTicks']), style: const TextStyle(fontSize: 11, color: Color(0x8CF5F5F7))),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _ensureBright() async {
+    if (bright != null) return;
+    try {
+      bright = await ScreenBrightness().current;
+    } catch (_) {
+      bright = .5;
+    }
+  }
+
+  Future<void> _setBright(double v) async {
+    bright = v.clamp(0.0, 1.0);
+    brightTouched = true;
+    try {
+      await ScreenBrightness().setScreenBrightness(bright!);
+    } catch (_) {}
+  }
+
+  void _eq(String k, double v) {
+    eq[k] = v;
+    try {
+      (player.platform as dynamic).setProperty(k, '${v.round()}');
+    } catch (_) {}
+  }
+
+  Future<void> _openView() async {
+    hideT?.cancel();
+    await _ensureBright();
+    if (!mounted) return;
+    setState(() {
+      viewOpen = true;
+      ui = false;
+    });
+  }
+
+  Future<void> _resetView() async {
+    for (final k in eq.keys.toList()) {
+      _eq(k, 0);
+    }
+    if (brightTouched) {
+      try {
+        await ScreenBrightness().resetScreenBrightness();
+      } catch (_) {}
+      brightTouched = false;
+      bright = null;
+      await _ensureBright();
+    }
+    if (mounted) setState(() {});
+  }
+
+  Widget _viewSlider(String label, String value, double v, double lo, double hi, ValueChanged<double> f) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(value, style: const TextStyle(fontSize: 13, color: Color(0x99F5F5F7))),
+          ]),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 6,
+              activeTrackColor: Colors.white,
+              inactiveTrackColor: Colors.white24,
+              thumbColor: Colors.white,
+              overlayShape: SliderComponentShape.noOverlay,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+            ),
+            child: Slider(value: v.clamp(lo, hi), min: lo, max: hi, onChanged: f),
+          ),
+        ]),
+      );
+
+  Widget _viewPanel() {
+    String sign(double v) => v > 0 ? '+${v.round()}' : '${v.round()}';
+    return Positioned(
+      right: 16,
+      top: 12,
+      bottom: 12,
+      width: 320,
+      child: SafeArea(
+        left: false,
+        child: GestureDetector(
+          onTap: () {},
+          child: Glass(
+            radius: 26,
+            color: const Color(0xD920202A),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+            child: ListView(padding: EdgeInsets.zero, children: [
+              Row(children: [
+                const Expanded(child: Text('Görüntü', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+                Pressable(
+                  onTap: _resetView,
+                  child: Container(
+                    height: 30,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Colors.white.withAlpha(26), borderRadius: BorderRadius.circular(15)),
+                    child: const Text('Sıfırla', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              const Text('EKRAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1, color: Color(0x80F5F5F7))),
+              const SizedBox(height: 6),
+              _viewSlider('Ekran parlaklığı', '%${((bright ?? .5) * 100).round()}', bright ?? .5, 0, 1, (v) {
+                _setBright(v);
+                setState(() {});
+              }),
+              const SizedBox(height: 4),
+              const Text('VİDEO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1, color: Color(0x80F5F5F7))),
+              const SizedBox(height: 6),
+              for (final k in eq.keys)
+                _viewSlider(_eqNames[k]!, sign(eq[k]!), eq[k]!, -50, 50, (v) {
+                  _eq(k, v);
+                  setState(() {});
+                }),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _ageCard(J i) {
     final k = ageKey(i['OfficialRating']);

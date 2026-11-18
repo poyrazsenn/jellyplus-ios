@@ -50,7 +50,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$P"
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$P"
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoadsForMedia bool true" "$P"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Jelly+" "$P" || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Jelly+" "$P"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Poyraz" "$P" || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Poyraz" "$P"
           /usr/libexec/PlistBuddy -c "Delete :UIStatusBarStyle" "$P" || true
           /usr/libexec/PlistBuddy -c "Add :UIStatusBarStyle string UIStatusBarStyleLightContent" "$P"
           /usr/libexec/PlistBuddy -c "Delete :UIViewControllerBasedStatusBarAppearance" "$P" || true

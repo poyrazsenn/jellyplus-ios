@@ -3,5 +3,9 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['download', 'Çevrimdışı geçiş', 'İnternet kesildiği an uygulama İndirilenler sekmesine geçer ve alt tarafta "Çevrimdışısın" şeridi görünür. Bağlantı gelince haber verir, izlediğin yeri Jellyfin\'e yazar ve tek dokunuşla Ana sayfaya döndürür.'],
+  ['star', 'Yeni isim ve logo', 'Jelly+ artık Poyraz Player; yeni P + oynat simgesi.'],
+  ['layout', 'Yeni arayüz', 'A · Cam tasarımı: kenardan kenara vitrin, havada duran cam alt bar, cam düğmeler, yeni detay sayfası.'],
+  ['star', 'Gerçek iPhone hissi', 'Dalga efektleri yerine iOS\'taki gibi hafif küçülme, iOS anahtarları ve geçişleri, titreşim.'],
+  ['next', 'Yepyeni oynatıcı', 'Sade cam kontroller, altta bölüm kartları, solda kaydırarak parlaklık, görüntü paneli (parlaklık, kontrast, doygunluk, gama).'],
+  ['star', 'Hoş geldin turu', 'İlk açılışta yeni Poyraz Player\'ı tanıtan kartlar.'],
 ];
