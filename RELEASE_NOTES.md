@@ -1,6 +1,9 @@
-## Poyraz Player 3.0 — beta 1
+## Poyraz Player 3.0 — beta 2
 
 **Yenilikler**
+- **Yeni Profil ekranı:** iPhone Ayarlar uygulaması gibi büyük başlık, renkli simgeli gruplar ve iOS anahtarları. Altyazı dili ve görünümü kendi sayfalarında; görünüm sayfasında canlı önizleme ve iOS seçiciler.
+
+**Beta 1'de gelenler**
 - **Yeni isim ve logo:** Jelly+ artık Poyraz Player; yeni P + oynat simgesi.
 - **Yeni arayüz:** A · Cam tasarımı: kenardan kenara vitrin, havada duran cam alt bar, cam düğmeler, yeni detay sayfası.
 - **Gerçek iPhone hissi:** Dalga efektleri yerine iOS'taki gibi hafif küçülme, iOS anahtarları ve geçişleri, titreşim.
