@@ -7,6 +7,7 @@ import 'api.dart';
 import 'util.dart';
 import 'version.dart';
 import 'welcome.dart';
+import 'whats_new.g.dart';
 
 /// "1.2.3-beta.4" → karşılaştırılabilir parçalar. Ön sürüm, aynı numaralı kararlı sürümden eskidir.
 int compareVersions(String a, String b) {
