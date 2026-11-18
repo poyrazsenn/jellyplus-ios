@@ -115,7 +115,7 @@ class _RowState extends State<_Row> {
           if (widget.chevron && tap != null && widget.trailing == null)
             const Padding(
               padding: EdgeInsets.only(left: 6),
-              child: Icon(CupertinoIcons.chevron_forward, size: 17, color: Color(0x59F5F5F7)),
+              child: Icon(Icons.chevron_right_rounded, size: 17, color: Color(0x59F5F5F7)),
             ),
         ]),
       ),
@@ -337,7 +337,7 @@ class _SubLangPageState extends State<_SubLangPage> {
           _Row(
             label: e.value,
             chevron: false,
-            trailing: e.key == api.subLang ? const Icon(CupertinoIcons.checkmark_alt, size: 20, color: kAccent) : null,
+            trailing: e.key == api.subLang ? const Icon(Icons.check_rounded, size: 20, color: kAccent) : null,
             onTap: () => setState(() => api.subLang = e.key),
           ),
       ]),

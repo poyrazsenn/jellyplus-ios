@@ -96,7 +96,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               onPressed: () => Navigator.pop(c, e.key),
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Text(e.value, style: TextStyle(fontWeight: e.key == sort ? FontWeight.w600 : FontWeight.w400)),
-                if (e.key == sort) ...[const SizedBox(width: 8), const Icon(CupertinoIcons.checkmark_alt, size: 18)],
+                if (e.key == sort) ...[const SizedBox(width: 8), const Icon(Icons.check_rounded, size: 18)],
               ]),
             ),
         ],
@@ -146,7 +146,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 GlassIcon(Icons.manage_search_rounded, size: 34, tooltip: 'Bu kütüphaneyi tara', onTap: _scan),
                 const SizedBox(width: 8),
               ],
-              GlassIcon(CupertinoIcons.arrow_up_arrow_down, size: 34, tooltip: 'Sırala: ${sorts[sort]}', onTap: _sortSheet),
+              GlassIcon(Icons.swap_vert_rounded, size: 34, tooltip: 'Sırala: ${sorts[sort]}', onTap: _sortSheet),
             ]),
           ),
           CupertinoSliverRefreshControl(onRefresh: () => load(true)),
@@ -193,7 +193,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         borderRadius: BorderRadius.circular(17),
                       ),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(unplayed ? CupertinoIcons.eye_slash_fill : CupertinoIcons.eye_slash,
+                        Icon(unplayed ? Icons.visibility_off : Icons.visibility_off_outlined,
                             size: 15, color: unplayed ? kInk : const Color(0xFFF5F5F7)),
                         const SizedBox(width: 6),
                         Text('İzlemediklerim',

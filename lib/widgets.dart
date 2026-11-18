@@ -242,7 +242,7 @@ class DescIcon extends StatelessWidget {
       );
 }
 
-/// Yatay (16:9) kart — Disney+ tarzı
+/// Yatay (16:9) kart — A · Cam: yuvarlak köşe, çerçevesiz, ilerleme çubuğu içeride
 class WideCard extends StatelessWidget {
   final J item;
   final double width;
@@ -254,24 +254,18 @@ class WideCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final w = wideImg(item);
     final ep = item['Type'] == 'Episode';
-    final s = item['ParentIndexNumber'], e = item['IndexNumber'];
     final season = item['Type'] == 'Season';
-    final name = ep
-        ? '${item['SeriesName'] != null ? '${item['SeriesName']} · ' : ''}${s != null && e != null ? 'S$s:B$e ' : ''}${item['Name'] ?? ''}'
-        : season && item['SeriesName'] != null
-            ? '${item['SeriesName']} · ${item['Name'] ?? ''}'
-            : '${item['Name'] ?? ''}';
+    final name = season && item['SeriesName'] != null ? '${item['SeriesName']} · ${item['Name'] ?? ''}' : '${item['Name'] ?? ''}';
     final lg = (!w.art && !ep && !text) ? logoUrl(item, w: 360) : null;
-    final showT = text || ep || season || (!w.art && lg == null);
+    final showT = !text && (ep || season || (!w.art && lg == null));
     final p = ((item['UserData']?['PlayedPercentage']) as num?)?.toDouble() ?? 0;
-    final ds = descs(item);
+    final r = width > 180 ? 14.0 : 12.0;
     Widget title() => Text(name,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-            fontWeight: FontWeight.w700, fontSize: 13, shadows: [Shadow(blurRadius: 6)]));
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, shadows: [Shadow(blurRadius: 8)]));
 
-    return GestureDetector(
+    return Pressable(
       onTap: onTap ?? () => openItem(context, item),
       child: SizedBox(
         width: width,
@@ -280,27 +274,24 @@ class WideCard extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: kCard,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white.withAlpha(26), width: 2),
-            boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, 6))],
+            borderRadius: BorderRadius.circular(r),
+            boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 16, offset: Offset(0, 8))],
           ),
           child: Stack(fit: StackFit.expand, children: [
             netImg(w.url, align: w.poster ? const Alignment(0, -.5) : Alignment.center),
-            if (lg != null || showT)
+            if (lg != null || showT || (p > 0 && p < 100))
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.center,
-                      colors: [Color(0xCC000000), Color(0x00000000)]),
+                      begin: Alignment.bottomCenter, end: Alignment.center, colors: [Color(0xB3000000), Color(0x00000000)]),
                 ),
               ),
             if (lg != null)
               Positioned(
                 left: width * .07,
-                bottom: width * .06,
-                width: width * .62,
-                height: width * .2,
+                bottom: width * .07,
+                width: width * .6,
+                height: width * .19,
                 child: CachedNetworkImage(
                   imageUrl: lg,
                   fit: BoxFit.contain,
@@ -308,25 +299,51 @@ class WideCard extends StatelessWidget {
                   errorWidget: (_, __, ___) => Align(alignment: Alignment.bottomLeft, child: title()),
                 ),
               ),
-            if (showT) Positioned(left: 8, right: 8, bottom: 8, child: title()),
-            Positioned(
-              top: 5,
-              right: 5,
-              child: Row(children: [
-                AgeBadge(item['OfficialRating'], size: 18),
-                for (final k in ds) Padding(padding: const EdgeInsets.only(left: 3), child: DescIcon(k, size: 18)),
-              ]),
-            ),
+            if (showT) Positioned(left: 10, right: 10, bottom: (p > 0 && p < 100) ? 20 : 10, child: title()),
             if (p > 0 && p < 100)
               Positioned(
-                  left: 0,
-                  bottom: 0,
-                  height: 3,
-                  width: (width - 4) * p / 100,
-                  child: const ColoredBox(color: Color(0xFF4DA6FF))),
+                left: 10,
+                right: 10,
+                bottom: 10,
+                height: 4,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(value: p / 100, color: kBlue, backgroundColor: const Color(0x40FFFFFF)),
+                ),
+              ),
           ]),
         ),
       ),
+    );
+  }
+}
+
+/// "İzlemeye devam et" kartı: büyük görsel, altında başlık ve kalan süre
+class ResumeCard extends StatelessWidget {
+  final J item;
+  final double width;
+  const ResumeCard(this.item, {super.key, required this.width});
+
+  @override
+  Widget build(BuildContext context) {
+    final ep = item['Type'] == 'Episode';
+    final s = item['ParentIndexNumber'], e = item['IndexNumber'];
+    final left = ((item['RunTimeTicks'] as num?) ?? 0) - ((item['UserData']?['PlaybackPositionTicks'] as num?) ?? 0);
+    final l = left > 0 ? rt(left) : '';
+    final title = ep ? '${item['SeriesName'] ?? item['Name'] ?? ''}' : '${item['Name'] ?? ''}';
+    final sub = [
+      if (ep && s != null && e != null) 'S$s · B$e' else if (!ep) 'Film',
+      if (l.isNotEmpty) '$l kaldı',
+    ].join(' · ');
+    return SizedBox(
+      width: width,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        WideCard(item, width: width, text: true, onTap: () => openPlayer(context, item)),
+        const SizedBox(height: 8),
+        Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 2),
+        Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0x99F5F5F7))),
+      ]),
     );
   }
 }
@@ -336,26 +353,35 @@ class Shelf extends StatelessWidget {
   final String title;
   final List<J> items;
   final bool resume;
-  const Shelf(this.title, this.items, {super.key, this.resume = false});
+  final VoidCallback? more;
+  const Shelf(this.title, this.items, {super.key, this.resume = false, this.more});
 
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return const SizedBox.shrink();
-    final cw = cardWidth(context), pad = hPad(context);
+    final pad = hPad(context);
+    final sw = MediaQuery.sizeOf(context).width;
+    final cw = resume ? (sw > 700 ? cardWidth(context) * 1.25 : sw * .56) : cardWidth(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
-        padding: EdgeInsets.fromLTRB(pad, 18, pad, 4),
-        child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        padding: EdgeInsets.fromLTRB(pad + 4, 22, pad, 2),
+        child: Pressable(
+          onTap: more,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.4)),
+            if (more != null) const Icon(Icons.chevron_right_rounded, size: 24, color: Color(0x99F5F5F7)),
+          ]),
+        ),
       ),
       SizedBox(
-        height: cw * 9 / 16 + 24,
+        height: cw * 9 / 16 + (resume ? 66 : 30),
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.fromLTRB(pad, 8, pad, 16),
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(pad, 10, pad, 18),
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (c, i) => WideCard(items[i],
-              width: cw, text: resume, onTap: resume ? () => openPlayer(c, items[i]) : null),
+          itemBuilder: (c, i) => resume ? ResumeCard(items[i], width: cw) : WideCard(items[i], width: cw),
         ),
       ),
     ]);

@@ -3,6 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['library', 'iOS kütüphane sayfaları', 'Filmler, Diziler ve Listem büyük iOS başlığıyla açılıyor. Hepsi / Film / Dizi seçimi iOS segment düğmesi, sıralama iOS menüsünden seçiliyor.'],
-  ['request', 'iPhone gibi yenileme', 'Aşağı çekince Android çarkı yerine iOS\'un kendi göstergesi çıkıyor (ana sayfa, kütüphaneler, istekler).'],
+  ['library', 'Yeni ana sayfa', 'Disney+ kutuları kalktı. Kütüphanelere cam kısayollar, büyük "İzlemeye devam et" kartları (altında kalan süre), yuvarlak köşeli çerçevesiz kartlar ve sıra başlığına dokununca tümünü görme.'],
+  ['star', 'Ayarlardaki soru işaretleri düzeldi', 'Ok ve tik simgeleri artık doğru görünüyor.'],
 ];

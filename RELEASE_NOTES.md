@@ -1,6 +1,11 @@
-## Poyraz Player 3.0 — beta 3
+## Poyraz Player 3.0 — beta 4
 
 **Yenilikler**
+
+- **Yeni ana sayfa:** Disney+ kutuları kalktı. Kütüphanelere cam kısayollar, büyük "İzlemeye devam et" kartları (altında kalan süre), yuvarlak köşeli çerçevesiz kartlar ve sıra başlığına dokununca tümünü görme.
+- **Ayarlardaki soru işaretleri düzeldi:** Ok ve tik simgeleri artık doğru görünüyor.
+
+**Beta 3'te gelenler**
 
 - **iOS kütüphane sayfaları:** Filmler, Diziler ve Listem büyük iOS başlığıyla açılıyor. Hepsi / Film / Dizi seçimi iOS segment düğmesi, sıralama iOS menüsünden seçiliyor.
 - **iPhone gibi yenileme:** Aşağı çekince Android çarkı yerine iOS'un kendi göstergesi çıkıyor (ana sayfa, kütüphaneler, istekler).
