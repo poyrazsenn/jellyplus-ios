@@ -1,6 +1,12 @@
-## Poyraz Player 3.0 — beta 6
+## Poyraz Player 3.0 — beta 7
 
 **Yenilikler**
+
+- **Yeni Arama:** Büyük "Ara" başlığı, cam arama kutusu. Sonuçlar üç bölümde: Sunucunda, Kişiler (fotoğraflı) ve Seerr'den istenebilenler.
+- **Yeni İndirilenler:** Depolama kartı; İndiriliyor, Diziler ve Filmler bölümleri. Diziler tek kartta toplanıyor, dokununca sezonlara göre bölümler açılıyor. İndirme ve silme menüleri iOS menüsü oldu.
+- **Geri okundaki soru işareti düzeldi:** iOS simgeleri artık uygulamanın içinde.
+
+**Beta 6'da gelenler**
 
 - **Yeni ses ve altyazı menüsü:** Oynatıcıda alttan açılan sayfa kalktı. Üstteki düğmenin altında iki sütunlu cam menü açılıyor: solda ses, hız ve gece modu; sağda altyazı, zamanlama ve altyazı arama.
 - **Gece modu:** Yüksek sesleri kısıp fısıltıları duyulur yapar; gece kulaklıksız izlerken işe yarar.

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -174,37 +175,43 @@ class _SeerrResultTileState extends State<SeerrResultTile> {
     final year = '${r['releaseDate'] ?? r['firstAirDate'] ?? ''}'.split('-').first;
     final img = Seerr.poster(r['posterPath']);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
           child: Container(
-            width: 52,
-            height: 78,
+            width: 40,
+            height: 60,
             color: kCard,
-            child: img.isEmpty ? const Icon(Icons.movie_outlined, color: kMuted) : CachedNetworkImage(imageUrl: img, fit: BoxFit.cover),
+            child: img.isEmpty ? const Icon(Icons.movie_outlined, size: 18, color: kMuted) : CachedNetworkImage(imageUrl: img, fit: BoxFit.cover),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${r['title'] ?? r['name'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('${r['title'] ?? r['name'] ?? ''}',
+                maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             const SizedBox(height: 3),
-            Text([if (year.isNotEmpty) year, r['mediaType'] == 'tv' ? 'Dizi' : 'Film'].join(' • '),
-                style: const TextStyle(color: kMuted, fontSize: 12)),
+            Text([r['mediaType'] == 'tv' ? 'Dizi' : 'Film', if (year.isNotEmpty) year].join(' · '),
+                style: const TextStyle(color: Color(0x8CF5F5F7), fontSize: 12)),
           ]),
         ),
         const SizedBox(width: 8),
         if (st <= 1)
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kBlue, shape: const StadiumBorder(), padding: const EdgeInsets.symmetric(horizontal: 16)),
-            onPressed: busy ? null : ask,
-            child: busy
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: kInk))
-                : const Text('İste', style: TextStyle(color: kInk, fontWeight: FontWeight.w700)),
+          Pressable(
+            onTap: busy ? null : ask,
+            child: Container(
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: kBlue, borderRadius: BorderRadius.circular(16)),
+              child: busy
+                  ? const CupertinoActivityIndicator(radius: 8, color: kInk)
+                  : const Text('İste', style: TextStyle(color: kInk, fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
           )
         else
-          Text(s.text, style: TextStyle(color: s.color, fontWeight: FontWeight.w600, fontSize: 12)),
+          Text(s.text, style: const TextStyle(color: kAccent, fontWeight: FontWeight.w600, fontSize: 12)),
       ]),
     );
   }

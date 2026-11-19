@@ -3,6 +3,7 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['subtitles', 'Yeni ses ve altyazı menüsü', 'Oynatıcıda alttan açılan sayfa kalktı. Üstteki düğmenin altında iki sütunlu cam menü açılıyor: solda ses, hız ve gece modu; sağda altyazı, zamanlama ve altyazı arama.'],
-  ['audio', 'Gece modu', 'Yüksek sesleri kısıp fısıltıları duyulur yapar; gece kulaklıksız izlerken işe yarar.'],
+  ['request', 'Yeni Arama', 'Büyük "Ara" başlığı, cam arama kutusu. Sonuçlar üç bölümde: Sunucunda, Kişiler (fotoğraflı) ve Seerr\'den istenebilenler.'],
+  ['next', 'Yeni İndirilenler', 'Depolama kartı; İndiriliyor, Diziler ve Filmler bölümleri. Diziler tek kartta toplanıyor, dokununca sezonlara göre bölümler açılıyor. İndirme ve silme menüleri iOS menüsü oldu.'],
+  ['star', 'Geri okundaki soru işareti düzeldi', 'iOS simgeleri artık uygulamanın içinde.'],
 ];
