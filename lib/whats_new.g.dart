@@ -3,7 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['request', 'Yeni Arama', 'Büyük "Ara" başlığı, cam arama kutusu. Sonuçlar üç bölümde: Sunucunda, Kişiler (fotoğraflı) ve Seerr\'den istenebilenler.'],
-  ['next', 'Yeni İndirilenler', 'Depolama kartı; İndiriliyor, Diziler ve Filmler bölümleri. Diziler tek kartta toplanıyor, dokununca sezonlara göre bölümler açılıyor. İndirme ve silme menüleri iOS menüsü oldu.'],
-  ['star', 'Geri okundaki soru işareti düzeldi', 'iOS simgeleri artık uygulamanın içinde.'],
+  ['request', 'Android parçaları temizlendi', 'Giriş, profil seçimi, oyuncu sayfası, İsteklerim, Seerr bağlantısı ve altyazı arama iOS düzenine geçti. Büyük başlıklar, cam metin kutuları, beyaz kapsül düğmeler.'],
+  ['update', 'iOS uyarıları', 'Güncelleme uyarısı iPhone\'un kendi uyarı penceresi; bildirimler alttan çıkan yuvarlak kapsül.'],
 ];

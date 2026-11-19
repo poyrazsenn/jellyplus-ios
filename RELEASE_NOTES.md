@@ -1,6 +1,11 @@
-## Poyraz Player 3.0 — beta 7
+## Poyraz Player 3.0 — beta 8
 
 **Yenilikler**
+
+- **Android parçaları temizlendi:** Giriş, profil seçimi, oyuncu sayfası, İsteklerim, Seerr bağlantısı ve altyazı arama iOS düzenine geçti. Büyük başlıklar, cam metin kutuları, beyaz kapsül düğmeler.
+- **iOS uyarıları:** Güncelleme uyarısı iPhone'un kendi uyarı penceresi; bildirimler alttan çıkan yuvarlak kapsül.
+
+**Beta 7'de gelenler**
 
 - **Yeni Arama:** Büyük "Ara" başlığı, cam arama kutusu. Sonuçlar üç bölümde: Sunucunda, Kişiler (fotoğraflı) ve Seerr'den istenebilenler.
 - **Yeni İndirilenler:** Depolama kartı; İndiriliyor, Diziler ve Filmler bölümleri. Diziler tek kartta toplanıyor, dokununca sezonlara göre bölümler açılıyor. İndirme ve silme menüleri iOS menüsü oldu.

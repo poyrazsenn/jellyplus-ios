@@ -90,10 +90,12 @@ class JellyPlus extends StatelessWidget {
         ),
         snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF2A2A30),
+          backgroundColor: const Color(0xF22C2C32),
           contentTextStyle: const TextStyle(color: Color(0xFFF5F5F7), fontSize: 14),
           actionTextColor: kAccent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: const StadiumBorder(),
+          insetPadding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
+          elevation: 0,
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(backgroundColor: kBlue, foregroundColor: kInk, shape: const StadiumBorder()),
@@ -145,50 +147,54 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  InputDecoration deco(String l) => InputDecoration(
-        labelText: l,
-        filled: true,
-        fillColor: Colors.white.withAlpha(20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-      );
-
   @override
   Widget build(BuildContext context) {
     final canBack = Navigator.of(context).canPop();
     return Scaffold(
-      appBar: canBack ? AppBar() : null,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                const Center(child: Logo(size: 44)),
-                const SizedBox(height: 32),
-                TextField(controller: srv, decoration: deco('Sunucu adresi'), keyboardType: TextInputType.url, autocorrect: false),
-                const SizedBox(height: 12),
-                TextField(controller: usr, decoration: deco('Kullanıcı adı'), autocorrect: false, textCapitalization: TextCapitalization.none),
-                const SizedBox(height: 12),
-                TextField(controller: pwd, decoration: deco('Şifre'), obscureText: true, onSubmitted: (_) => go()),
-                if (err.isNotEmpty)
-                  Padding(padding: const EdgeInsets.only(top: 14), child: Text(err, style: const TextStyle(color: Color(0xFFFF8A8A)))),
-                const SizedBox(height: 22),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                      backgroundColor: kBlue,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: const StadiumBorder()),
-                  onPressed: busy ? null : go,
-                  child: busy
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kInk))
-                      : const Text('Giriş yap', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: kInk)),
-                ),
-              ]),
+      backgroundColor: kBg,
+      body: Stack(children: [
+        Container(
+          height: 420,
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(center: Alignment(.6, -1), radius: 1.1, colors: [Color(0x40FFD6AA), Color(0x00FFD6AA)]),
+          ),
+        ),
+        SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const Center(child: PMark(size: 72)),
+                  const SizedBox(height: 18),
+                  const Text('Poyraz Player', textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -.8)),
+                  const SizedBox(height: 6),
+                  const Text('Jellyfin sunucuna giriş yap', textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 15, color: Color(0x99F5F5F7))),
+                  const SizedBox(height: 30),
+                  IosField(srv, 'Sunucu adresi', keyboardType: TextInputType.url, action: TextInputAction.next),
+                  const SizedBox(height: 10),
+                  IosField(usr, 'Kullanıcı adı', action: TextInputAction.next),
+                  const SizedBox(height: 10),
+                  IosField(pwd, 'Şifre', obscure: true, action: TextInputAction.go, onSubmitted: (_) => go()),
+                  if (err.isNotEmpty)
+                    Padding(padding: const EdgeInsets.only(top: 14), child: Text(err, style: const TextStyle(color: Color(0xFFFF8A8A)))),
+                  const SizedBox(height: 22),
+                  PillButton('Giriş yap', height: 54, expand: true, busy: busy, onTap: go),
+                ]),
+              ),
             ),
           ),
         ),
-      ),
+        if (canBack)
+          Positioned(
+            left: 14,
+            top: MediaQuery.paddingOf(context).top + 8,
+            child: GlassIcon(Icons.arrow_back_ios_new_rounded, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
+          ),
+      ]),
     );
   }
 }
@@ -202,7 +208,7 @@ class ProfilesScreen extends StatefulWidget {
 
 class _ProfilesScreenState extends State<ProfilesScreen> {
   bool edit = false;
-  static const colors = [Color(0xFF0063E5), Color(0xFFE5484D), Color(0xFF30A46C), Color(0xFFD98E04), Color(0xFF8E4EC6), Color(0xFF12A594)];
+  static const colors = [Color(0xFF3E5C77), Color(0xFF6B5A48), Color(0xFF2E4B3C), Color(0xFF4A3F6B), Color(0xFF5B3A2E), Color(0xFF3A3F57)];
 
   Future<void> pick(Account a) async {
     final api = Api.I;
@@ -238,20 +244,22 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     final acc = Api.I.accounts;
     final size = MediaQuery.sizeOf(context).width > 700 ? 120.0 : 92.0;
     return Scaffold(
+      backgroundColor: kBg,
       body: Container(
         decoration: const BoxDecoration(
-            gradient: RadialGradient(center: Alignment.topCenter, radius: 1.3, colors: [Color(0xFF1B2A5C), kBg])),
+            gradient: RadialGradient(center: Alignment(.5, -1.1), radius: 1.2, colors: [Color(0x38FFD6AA), Color(0x000B0B0D)])),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(children: [
                 Text(edit ? 'Profilleri düzenle' : 'Kim izliyor?',
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -.8)),
                 const SizedBox(height: 32),
                 Wrap(spacing: 22, runSpacing: 22, alignment: WrapAlignment.center, children: [
                   for (var i = 0; i < acc.length; i++)
-                    GestureDetector(
+                    Pressable(
+                      haptic: true,
                       onTap: () => pick(acc[i]),
                       child: SizedBox(
                         width: size + 10,
@@ -283,11 +291,11 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                               ),
                           ]),
                           const SizedBox(height: 10),
-                          Text(acc[i].name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, color: Color(0xFFCFD5EA))),
+                          Text(acc[i].name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, color: Color(0xB8F5F5F7))),
                         ]),
                       ),
                     ),
-                  GestureDetector(
+                  Pressable(
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
                     child: SizedBox(
                       width: size + 10,
@@ -297,16 +305,19 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                             backgroundColor: Colors.white.withAlpha(20),
                             child: Icon(Icons.add, size: size * .4, color: Colors.white)),
                         const SizedBox(height: 10),
-                        const Text('Profil ekle', style: TextStyle(fontSize: 15, color: Color(0xFFCFD5EA))),
+                        const Text('Profil ekle', style: TextStyle(fontSize: 15, color: Color(0xB8F5F5F7))),
                       ]),
                     ),
                   ),
                 ]),
                 const SizedBox(height: 34),
-                OutlinedButton(
-                  onPressed: () => setState(() => edit = !edit),
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38)),
-                  child: Text(edit ? 'Bitti' : 'Profilleri düzenle'),
+                Pressable(
+                  onTap: () => setState(() => edit = !edit),
+                  child: Glass(
+                    radius: 22,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                    child: Text(edit ? 'Bitti' : 'Profilleri düzenle', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
                 ),
               ]),
             ),

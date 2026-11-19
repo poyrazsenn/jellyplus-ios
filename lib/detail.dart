@@ -119,9 +119,20 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (err.isNotEmpty) return Scaffold(appBar: AppBar(), body: ErrorView(err, retry: load));
+    Widget bare(Widget body) => Scaffold(
+          backgroundColor: kBg,
+          body: Stack(children: [
+            Positioned.fill(child: body),
+            Positioned(
+              left: 14,
+              top: MediaQuery.paddingOf(context).top + 8,
+              child: GlassIcon(Icons.arrow_back_ios_new_rounded, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
+            ),
+          ]),
+        );
+    if (err.isNotEmpty) return bare(ErrorView(err, retry: load));
     final x = it;
-    if (x == null) return Scaffold(appBar: AppBar(backgroundColor: Colors.transparent), body: const Loading());
+    if (x == null) return bare(const Loading());
     final w = MediaQuery.sizeOf(context).width;
     final pad = hPad(context);
     final p = pit ?? x;
@@ -437,10 +448,8 @@ class _DetailScreenState extends State<DetailScreen> {
               padding: EdgeInsets.fromLTRB(pad, 6, pad, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  icon: const Icon(Icons.download_outlined, size: 20),
-                  label: Text(season == null || season == 0 ? 'Özel bölümleri indir' : '$season. sezonu indir'),
-                  onPressed: () {
+                child: Pressable(
+                  onTap: () {
                     final todo = list.where((e) => Downloads.I.of('${e['Id']}') == null).toList();
                     if (todo.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -449,6 +458,17 @@ class _DetailScreenState extends State<DetailScreen> {
                     }
                     askDownload(context, todo, title: '${todo.length} bölümü indir');
                   },
+                  child: Container(
+                    height: 34,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(color: const Color(0x1FFFFFFF), borderRadius: BorderRadius.circular(17)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFFF5F5F7)),
+                      const SizedBox(width: 6),
+                      Text(season == null || season == 0 ? 'Özel bölümleri indir' : 'Sezon $season\'i indir',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
                 ),
               ),
             ),
@@ -536,13 +556,24 @@ class _DetailScreenState extends State<DetailScreen> {
               width: 26,
               height: 26,
               child: CircularProgressIndicator(value: b.frac == 0 ? null : b.frac, strokeWidth: 2, color: kBlue)),
-        IconButton(
-          padding: EdgeInsets.zero,
-          iconSize: b.frac != null ? 14 : 22,
-          tooltip: b.label,
-          icon: Icon(b.frac != null ? Icons.stop_rounded : b.icon,
-              color: d?.state == DlState.done ? kBlue : Colors.white70),
-          onPressed: () => d == null ? askDownload(c, [e]) : dlActions(c, d),
+        Semantics(
+          button: true,
+          label: b.label,
+          child: Pressable(
+            onTap: () => d == null ? askDownload(c, [e]) : dlActions(c, d),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Icon(
+                  b.frac != null
+                      ? Icons.stop_rounded
+                      : d?.state == DlState.done
+                          ? Icons.check_circle_rounded
+                          : Icons.arrow_circle_down_rounded,
+                  size: b.frac != null ? 14 : 24,
+                  color: d?.state == DlState.done ? kBlue : const Color(0xB3F5F5F7)),
+            ),
+          ),
         ),
       ]),
     );
@@ -575,8 +606,7 @@ class _DetailScreenState extends State<DetailScreen> {
             itemBuilder: (c, i) {
               final p = cast[i];
               final tag = p['PrimaryImageTag'];
-              return InkWell(
-                borderRadius: BorderRadius.circular(8),
+              return Pressable(
                 onTap: () => Navigator.of(c).push(
                     MaterialPageRoute(builder: (_) => PersonScreen(id: '${p['Id']}', name: '${p['Name']}'))),
                 child: SizedBox(

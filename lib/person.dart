@@ -69,20 +69,22 @@ class _PersonScreenState extends State<PersonScreen> {
     final pad = hPad(context);
     final w = MediaQuery.sizeOf(context).width;
     final cols = w > 1000 ? 4 : (w > 700 ? 3 : 2);
+    final nav = iosNav('${x?['Name'] ?? widget.name}');
     return Scaffold(
-      appBar: AppBar(title: Text(x?['Name'] ?? widget.name, style: const TextStyle(fontWeight: FontWeight.w700))),
+      backgroundColor: kBg,
       body: err.isNotEmpty
-          ? ErrorView(err, retry: load)
+          ? CustomScrollView(slivers: [nav, SliverFillRemaining(hasScrollBody: false, child: ErrorView(err, retry: load))])
           : x == null
-              ? const Loading()
-              : CustomScrollView(slivers: [
+              ? CustomScrollView(slivers: [nav, const SliverFillRemaining(hasScrollBody: false, child: Loading())])
+              : CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
+                  nav,
                   SliverToBoxAdapter(child: _head(x, pad)),
                   if ((works ?? const []).isNotEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(pad, 22, pad, 10),
                         child: Text('Arşivindekiler (${works!.length})',
-                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.4)),
                       ),
                     ),
                   SliverPadding(
@@ -117,20 +119,18 @@ class _PersonScreenState extends State<PersonScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
               width: 120,
               height: 170,
               color: kCard,
-              child: img == null ? const Icon(Icons.person, size: 56, color: kMuted) : netImg(img, fit: BoxFit.cover),
+              child: img == null ? const Icon(Icons.person_rounded, size: 56, color: kMuted) : netImg(img, fit: BoxFit.cover),
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${x['Name'] ?? ''}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 10),
-              if (facts.isEmpty)
+                            if (facts.isEmpty)
                 const Text('Jellyfin\'de doğum bilgisi yok.', style: TextStyle(color: kMuted, fontSize: 13)),
               for (final f in facts)
                 Padding(
@@ -146,13 +146,14 @@ class _PersonScreenState extends State<PersonScreen> {
         ]),
         if (bio.isNotEmpty) ...[
           const SizedBox(height: 16),
-          InkWell(
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => bioOpen = !bioOpen),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(bio,
                   maxLines: bioOpen ? null : 5,
                   overflow: bioOpen ? TextOverflow.visible : TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, height: 1.5, color: Color(0xFFCFD5EA))),
+                  style: const TextStyle(fontSize: 14, height: 1.5, color: Color(0xB8F5F5F7))),
               const SizedBox(height: 4),
               Text(bioOpen ? 'Daha az' : 'Devamını oku',
                   style: const TextStyle(color: kBlue, fontWeight: FontWeight.w600, fontSize: 13)),

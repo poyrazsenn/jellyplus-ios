@@ -858,7 +858,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: kSheet,
+      backgroundColor: const Color(0xF2202026),
       constraints: BoxConstraints(maxWidth: 760, maxHeight: MediaQuery.sizeOf(context).height * .92),
       builder: (c) => StatefulBuilder(builder: (c, set) {
         Future<void> search() async {
@@ -931,61 +931,94 @@ class _PlayerScreenState extends State<PlayerScreen> {
           started = true;
           Future.microtask(search);
         }
-        const muted = TextStyle(color: kMuted, fontSize: 12);
+        const muted = TextStyle(color: Color(0x8CF5F5F7), fontSize: 12);
         return SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(c).bottom),
+            padding: EdgeInsets.fromLTRB(20, 4, 20, MediaQuery.viewInsetsOf(c).bottom),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Row(children: [
-                const Text('Altyazı ara', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                const Spacer(),
-                DropdownButton<String>(
-                  value: lang,
-                  dropdownColor: const Color(0xFF151B3A),
-                  underline: const SizedBox.shrink(),
-                  items: [for (final e in _langs.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-                  onChanged: (v) {
-                    if (v == null) return;
-                    lang = v;
-                    search();
-                  },
-                ),
-              ]),
-              const SizedBox(height: 6),
-              TextField(
+              const Text('Altyazı ara', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, letterSpacing: -.5)),
+              const SizedBox(height: 12),
+              CupertinoSearchTextField(
                 controller: q,
-                textInputAction: TextInputAction.search,
+                placeholder: 'Başlık (boş bırak: otomatik bulur)',
+                style: const TextStyle(color: Color(0xFFF5F5F7)),
+                backgroundColor: Colors.white.withAlpha(26),
                 onSubmitted: (_) => search(),
-                decoration: InputDecoration(
-                  hintText: 'Başlık (boş bırak: otomatik bulur)',
-                  isDense: true,
-                  filled: true,
-                  fillColor: Colors.white10,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                  suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: search),
-                ),
               ),
-              if (msg.isNotEmpty) Padding(padding: const EdgeInsets.all(14), child: Text(msg, style: muted)),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 34,
+                child: ListView(scrollDirection: Axis.horizontal, children: [
+                  for (final e in _langs.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Pressable(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          lang = e.key;
+                          search();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: lang == e.key ? kBlue : Colors.white.withAlpha(31),
+                            borderRadius: BorderRadius.circular(17),
+                          ),
+                          child: Text(e.value,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: lang == e.key ? kInk : const Color(0xFFF5F5F7))),
+                        ),
+                      ),
+                    ),
+                ]),
+              ),
+              if (msg == 'Aranıyor…')
+                const Padding(padding: EdgeInsets.all(24), child: CupertinoActivityIndicator())
+              else if (msg.isNotEmpty)
+                Padding(padding: const EdgeInsets.symmetric(vertical: 18), child: Text(msg, style: muted)),
               Expanded(
-                child: ListView.builder(
+                child: ListView.separated(
+                  padding: const EdgeInsets.only(top: 8, bottom: 12),
                   itemCount: res.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0x14FFFFFF)),
                   itemBuilder: (_, i) {
                     final x = res[i];
                     final tags = <String?>[
-                      x['IsHashMatch'] == true
-                          ? '⭐ Tam senkron'
-                          : (x['IsReleaseMatch'] == true ? '🎯 Sürüm eşleşti' : null),
+                      x['IsHashMatch'] == true ? 'Tam senkron' : (x['IsReleaseMatch'] == true ? 'Sürüm eşleşti' : null),
                       '${x['Provider'] ?? ''}',
                       '${x['LanguageName'] ?? x['Language'] ?? ''}',
                       if (x['HearingImpaired'] == true) 'İşitme engelli',
                       if (x['DownloadCount'] != null) '${x['DownloadCount']} indirme',
-                    ].whereType<String>().where((s) => s.isNotEmpty).join(' • ');
-                    return ListTile(
-                      dense: true,
-                      enabled: loadingId == null,
-                      title: Text('${x['ReleaseName'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis),
-                      subtitle: Text(loadingId == '${x['Id']}' ? 'İndiriliyor…' : tags, style: muted),
-                      onTap: () => download(x),
+                    ].whereType<String>().where((s) => s.isNotEmpty).join(' · ');
+                    final me = loadingId == '${x['Id']}';
+                    return Pressable(
+                      onTap: loadingId == null ? () => download(x) : null,
+                      child: Container(
+                        color: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        child: Row(children: [
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('${x['ReleaseName'] ?? ''}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 3),
+                              Text(tags,
+                                  style: x['IsHashMatch'] == true
+                                      ? const TextStyle(color: kAccent, fontSize: 12)
+                                      : muted),
+                            ]),
+                          ),
+                          const SizedBox(width: 10),
+                          me
+                              ? const CupertinoActivityIndicator()
+                              : const Icon(Icons.arrow_circle_down_rounded, size: 24, color: Color(0xB3F5F5F7)),
+                        ]),
+                      ),
                     );
                   },
                 ),
@@ -996,52 +1029,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }),
     );
     q.dispose();
-    _armHide();
-  }
-
-  Future<void> _episodesSheet() async {
-    hideT?.cancel();
-    final cur = it;
-    final season = cur?['ParentIndexNumber'];
-    final list = eps.where((e) => e['ParentIndexNumber'] == season).toList();
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: kSheet,
-      constraints: BoxConstraints(maxWidth: 720, maxHeight: MediaQuery.sizeOf(context).height * .9),
-      builder: (c) => SafeArea(
-        child: ListView.builder(
-          itemCount: list.length,
-          itemBuilder: (_, i) {
-            final e = list[i];
-            final now = e['Id'] == cur?['Id'];
-            final tag = (e['ImageTags'] as Map?)?['Primary'];
-            return ListTile(
-              selected: now,
-              selectedTileColor: Colors.white10,
-              leading: SizedBox(
-                width: 96,
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                        color: kCard,
-                        child: tag != null ? netImg(api.image(e['Id'], 'Primary', tag: tag, w: 300)) : null),
-                  ),
-                ),
-              ),
-              title: Text('${e['IndexNumber'] ?? ''}. ${e['Name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(rt(e['RunTimeTicks']), style: const TextStyle(color: kMuted)),
-              onTap: () {
-                Navigator.pop(c);
-                if (!now) _start(e);
-              },
-            );
-          },
-        ),
-      ),
-    );
     _armHide();
   }
 
@@ -1274,7 +1261,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Flexible(child: SingleChildScrollView(child: SelectableText(err, textAlign: TextAlign.center))),
                 const SizedBox(height: 18),
-                FilledButton(onPressed: _close, child: const Text('Kapat')),
+                PillButton('Kapat', onTap: _close),
               ]),
             ),
         ]),

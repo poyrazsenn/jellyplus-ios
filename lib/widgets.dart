@@ -3,6 +3,7 @@ import 'dart:math' show min;
 import 'dart:ui' show ImageFilter;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -172,21 +173,24 @@ class GlassIcon extends StatelessWidget {
 class PillButton extends StatelessWidget {
   final String label;
   final IconData? icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final double height;
   final bool expand;
-  const PillButton(this.label, {super.key, this.icon, required this.onTap, this.height = 48, this.expand = false});
+  final bool busy;
+  const PillButton(this.label, {super.key, this.icon, required this.onTap, this.height = 48, this.expand = false, this.busy = false});
   @override
   Widget build(BuildContext context) => Pressable(
         haptic: true,
-        onTap: onTap,
+        onTap: busy ? null : onTap,
         child: Container(
           height: height,
           width: expand ? double.infinity : null,
           padding: const EdgeInsets.symmetric(horizontal: 22),
           decoration: BoxDecoration(color: kBlue, borderRadius: BorderRadius.circular(height / 2)),
           child: Row(mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
-            if (icon != null) ...[Icon(icon, color: kInk, size: 24), const SizedBox(width: 6)],
+            if (busy) const CupertinoActivityIndicator(color: kInk, radius: 10),
+            if (icon != null && !busy) ...[Icon(icon, color: kInk, size: 24), const SizedBox(width: 6)],
+            if (!busy)
             Flexible(
               child: Text(label,
                   maxLines: 1,
@@ -636,6 +640,46 @@ class ErrorView extends StatelessWidget {
               PillButton('Tekrar dene', onTap: retry!, height: 42),
             ],
           ]),
+        ),
+      );
+}
+
+/// iOS büyük başlıklı üst çubuk (sliver)
+Widget iosNav(String title, {String? back = 'Geri', Widget? trailing}) => CupertinoSliverNavigationBar(
+      largeTitle: Text(title, style: const TextStyle(color: Color(0xFFF5F5F7))),
+      backgroundColor: const Color(0xCC0B0B0D),
+      border: null,
+      previousPageTitle: back,
+      trailing: trailing,
+    );
+
+/// Cam metin kutusu (Material çizgili alan yerine)
+class IosField extends StatelessWidget {
+  final TextEditingController controller;
+  final String placeholder;
+  final bool obscure;
+  final TextInputType? keyboardType;
+  final ValueChanged<String>? onSubmitted;
+  final TextInputAction? action;
+  const IosField(this.controller, this.placeholder,
+      {super.key, this.obscure = false, this.keyboardType, this.onSubmitted, this.action});
+  @override
+  Widget build(BuildContext context) => CupertinoTextField(
+        controller: controller,
+        placeholder: placeholder,
+        obscureText: obscure,
+        keyboardType: keyboardType,
+        textInputAction: action,
+        onSubmitted: onSubmitted,
+        autocorrect: false,
+        cursorColor: kAccent,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        style: const TextStyle(color: Color(0xFFF5F5F7), fontSize: 16),
+        placeholderStyle: const TextStyle(color: Color(0x73F5F5F7), fontSize: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(22),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withAlpha(20)),
         ),
       );
 }

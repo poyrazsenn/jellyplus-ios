@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -69,33 +70,34 @@ Future<void> checkUpdate(BuildContext context) async {
   if (api.prefs.getString('skipver') == latest) return;
   if (!context.mounted) return;
   final url = '${j['url'] ?? ''}';
-  await showDialog(
+  await showCupertinoDialog(
     context: context,
-    builder: (c) => AlertDialog(
-      backgroundColor: kSheet,
+    builder: (c) => CupertinoAlertDialog(
       title: const Text('Yeni sürüm var'),
       content: Text(
         'Poyraz Player $latest çıktı (sende $kVersion).'
         '${'${j['notes'] ?? ''}'.isNotEmpty ? '\n\n${j['notes']}' : ''}'
-        '\n\nYeni IPA\'yı Sideloadly ile aynı şekilde kurman yeterli; girişlerin ve indirdiklerin silinmez.',
+        '\n\nYeni IPA\'yı Sideloadly ile aynı şekilde kur; girişlerin ve indirdiklerin silinmez.',
       ),
       actions: [
-        TextButton(
-          onPressed: () {
-            api.prefs.setString('skipver', latest);
-            Navigator.pop(c);
-          },
-          child: const Text('Bu sürümü atla'),
-        ),
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('Sonra')),
         if (url.isNotEmpty)
-          FilledButton(
+          CupertinoDialogAction(
+            isDefaultAction: true,
             onPressed: () {
               Navigator.pop(c);
               launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
             },
             child: const Text('İndir'),
           ),
+        CupertinoDialogAction(onPressed: () => Navigator.pop(c), child: const Text('Sonra')),
+        CupertinoDialogAction(
+          isDestructiveAction: true,
+          onPressed: () {
+            api.prefs.setString('skipver', latest);
+            Navigator.pop(c);
+          },
+          child: const Text('Bu sürümü atla'),
+        ),
       ],
     ),
   );
