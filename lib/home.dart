@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
@@ -114,70 +115,124 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  static IconData _libIcon(Object? t) => t == 'movies'
+      ? Icons.movie_outlined
+      : t == 'tvshows'
+          ? Icons.live_tv_outlined
+          : Icons.folder_outlined;
+
+  Widget _pill(String label, IconData? icon, VoidCallback onTap) => Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Pressable(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0x1FFFFFFF),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0x1AFFFFFF)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (icon != null) ...[Icon(icon, size: 17, color: const Color(0xFFF5F5F7)), const SizedBox(width: 7)],
+              Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final pad = hPad(context);
-    final tw = cardWidth(context);
     return Scaffold(
+      extendBodyBehindAppBar: true,
       body: loading
           ? const Loading()
           : err.isNotEmpty
               ? ErrorView(err, retry: load)
-              : RefreshIndicator(
-                  onRefresh: () => load(silent: true),
-                  child: CustomScrollView(slivers: [
-                    SliverAppBar(
-                      floating: true,
-                      snap: true,
-                      backgroundColor: const Color(0xEB040714),
-                      title: const Logo(),
-                      centerTitle: false,
+              : CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Stack(children: [
+                        HeroCarousel(feat),
+                        Positioned(
+                          left: pad + 4,
+                          right: pad,
+                          top: MediaQuery.paddingOf(context).top + 10,
+                          child: Row(children: [
+                            const Logo(size: 21),
+                            const Spacer(),
+                            Semantics(
+                              button: true,
+                              label: 'Profil',
+                              child: Pressable(
+                                onTap: () => tabBus.value = 4,
+                                child: Glass(
+                                  radius: 19,
+                                  child: SizedBox(
+                                    width: 38,
+                                    height: 38,
+                                    child: Center(
+                                      child: Text(api.name.isEmpty ? '?' : api.name[0].toUpperCase(),
+                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ]),
                     ),
-                    SliverToBoxAdapter(child: HeroCarousel(feat)),
-                    // kütüphaneler + stüdyolar (Disney/Pixar/Marvel kutuları gibi)
-                    if (libs.isNotEmpty || studios.isNotEmpty)
+                    CupertinoSliverRefreshControl(onRefresh: () => load(silent: true)),
+                    // kütüphane kısayolları: cam kapsüller
+                    if (libs.isNotEmpty)
                       SliverToBoxAdapter(
                         child: SizedBox(
-                          height: tw * 9 / 16 + 36,
+                          height: 56,
                           child: ListView(
                             scrollDirection: Axis.horizontal,
-                            padding: EdgeInsets.fromLTRB(pad, 14, pad, 20),
+                            physics: const BouncingScrollPhysics(),
+                            padding: EdgeInsets.fromLTRB(pad, 6, pad, 6),
                             children: [
                               for (final v in libs)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 12),
-                                  child: BrandTile(
-                                    title: '${v['Name']}',
-                                    icon: v['CollectionType'] == 'movies'
-                                        ? Icons.movie_outlined
-                                        : v['CollectionType'] == 'tvshows'
-                                            ? Icons.tv
-                                            : Icons.folder_outlined,
-                                    width: tw,
-                                    onTap: () => openLibrary(context, '${v['Name']}', '&ParentId=${v['Id']}'),
-                                  ),
-                                ),
-                              for (final s in studios)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 12),
-                                  child: BrandTile(
-                                    title: s.name,
-                                    image: s.img,
-                                    width: tw,
-                                    onTap: () => openLibrary(context, s.name, '&StudioIds=${s.id}'),
-                                  ),
-                                ),
+                                _pill('${v['Name']}', _libIcon(v['CollectionType']),
+                                    () => openLibrary(context, '${v['Name']}', '&ParentId=${v['Id']}')),
                             ],
                           ),
                         ),
                       ),
                     SliverToBoxAdapter(child: Shelf('İzlemeye devam et', res, resume: true)),
-                    SliverToBoxAdapter(child: Shelf('Listem', fav)),
+                    SliverToBoxAdapter(child: Shelf('Listem', fav, more: () => tabBus.value = 2)),
                     for (var i = 0; i < libs.length && i < lat.length; i++)
-                      SliverToBoxAdapter(child: Shelf('Yeni eklenenler: ${libs[i]['Name']}', lat[i])),
+                      SliverToBoxAdapter(
+                          child: Shelf('Yeni: ${libs[i]['Name']}', lat[i],
+                              more: () => openLibrary(context, '${libs[i]['Name']}', '&ParentId=${libs[i]['Id']}'))),
                     SliverToBoxAdapter(child: Shelf('Koleksiyonlar', cols)),
-                    const SliverToBoxAdapter(child: SizedBox(height: 30)),
-                  ]),
+                    if (studios.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(pad + 4, 22, pad, 10),
+                            child: const Text('Stüdyolar', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.4)),
+                          ),
+                          SizedBox(
+                            height: 44,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              padding: EdgeInsets.symmetric(horizontal: pad),
+                              children: [
+                                for (final st in studios)
+                                  _pill(st.name, null, () => openLibrary(context, st.name, '&StudioIds=${st.id}')),
+                              ],
+                            ),
+                          ),
+                        ]),
+                      ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                  ],
                 ),
     );
   }

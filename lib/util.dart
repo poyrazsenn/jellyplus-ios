@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 
-const kBg = Color(0xFF040714);
-const kBar = Color(0xF2090B13);
-const kCard = Color(0xFF1B1F33);
-const kBlue = Color(0xFF2F8CFF);
-const kMuted = Color(0xFFA8B0C8);
+// Poyraz Player · A · Cam tasarım sistemi
+const kBg = Color(0xFF0B0B0D); // zemin
+const kBar = Color(0xF20B0B0D);
+const kCard = Color(0xFF1C1C21); // kart / görsel yer tutucu
+const kSheet = Color(0xFF1C1C21); // alttan açılan sayfalar
+const kBlue = Color(0xFFF5F5F7); // birincil (beyaz düğmeler, ilerleme)
+const kInk = Color(0xFF0B0B0D); // beyaz zemin üstündeki yazı
+const kAccent = Color(0xFFFFC98F); // sıcak ışık (logo üçgeni, vurgular)
+const kMuted = Color(0xFF9C9CA6);
+const kGlass = Color(0x9926262C); // buğulu cam dolgusu
 
 double hPad(BuildContext c) => MediaQuery.sizeOf(c).width > 700 ? 28 : 16;
 
@@ -44,6 +49,13 @@ String? ageKey(String? r) {
   if (m == null) return null;
   final n = int.parse(m.group(0)!);
   return n <= 0 ? 'all' : (n <= 9 ? '7' : (n <= 17 ? '13' : '18'));
+}
+
+/// Apple TV gibi düz yaş etiketi: 13+, Genel
+String? ageLabel(String? r) {
+  final k = ageKey(r);
+  if (k == null) return null;
+  return k == 'all' ? 'Genel' : '$k+';
 }
 
 const kAgeText = {

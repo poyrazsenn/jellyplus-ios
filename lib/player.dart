@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'api.dart';
@@ -58,6 +60,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? cdT; // sonraki bölüm geri sayımı
   int cd = 0;
   String? cdOff; // geri sayımı iptal edilen bölüm
+  // 3.0: bölüm şeridi, görüntü paneli, parlaklık
+  bool epsOpen = false, viewOpen = false, tracksOpen = false, night = false, dragBright = false, hud = false, brightTouched = false;
+  num? epsSeason;
+  double? bright;
+  Timer? hudT;
+  final eq = <String, double>{'brightness': 0, 'contrast': 0, 'saturation': 0, 'gamma': 0};
+  static const _eqNames = {'brightness': 'Parlaklık', 'contrast': 'Kontrast', 'saturation': 'Doygunluk', 'gamma': 'Gama'};
   String sid = '';
   bool transcode = false, burn = false, closed = false, ready = false;
   int? audioIdx, subIdx, defAudio;
@@ -126,6 +135,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     repT?.cancel();
     ageT?.cancel();
     cdT?.cancel();
+    hudT?.cancel();
+    if (brightTouched) ScreenBrightness().resetScreenBrightness().catchError((_) {});
     for (final s in subs) {
       s.cancel();
     }
@@ -524,9 +535,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
         width: dw + 4,
         height: dh + 4,
         decoration: BoxDecoration(
-            color: Colors.black, border: Border.all(color: Colors.white, width: 2), borderRadius: BorderRadius.circular(4)),
+            color: Colors.black, border: Border.all(color: Colors.white54), borderRadius: BorderRadius.circular(12)),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(2),
+          borderRadius: BorderRadius.circular(11),
           child: OverflowBox(
             alignment: Alignment.topLeft,
             minWidth: 0,
@@ -612,7 +623,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _armHide() {
     hideT?.cancel();
     hideT = Timer(const Duration(seconds: 4), () {
-      if (mounted && playing && !dragging) setState(() => ui = false);
+      if (mounted && playing && !dragging && !tracksOpen) setState(() => ui = false);
     });
   }
 
@@ -634,120 +645,199 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _showUI();
   }
 
-  Future<void> _tracksSheet() async {
-    hideT?.cancel();
+  void _toggleTracks() {
+    setState(() {
+      tracksOpen = !tracksOpen;
+      viewOpen = false;
+      ui = true;
+    });
+    if (tracksOpen) {
+      hideT?.cancel();
+    } else {
+      _armHide();
+    }
+  }
+
+  void _setNight(bool v) {
+    night = v;
+    try {
+      (player.platform as dynamic).setProperty('af', v ? 'lavfi=[dynaudnorm=f=200:g=11:p=0.9]' : '');
+    } catch (_) {}
+    setState(() {});
+  }
+
+  static const _speeds = [.75, 1.0, 1.25, 1.5, 2.0];
+  static String _num(double v) => (v == v.roundToDouble() ? v.toStringAsFixed(0) : '$v').replaceAll('.', ',');
+
+  /// A · Cam: kapsülün altında açılan iki sütunlu cam menü (Ses | Altyazı)
+  Widget _tracksPanel() {
     final auds = streams.where((s) => s['Type'] == 'Audio').toList();
     final subs = streams.where((s) => s['Type'] == 'Subtitle').toList();
     String lbl(J s) => '${s['DisplayTitle'] ?? s['Language'] ?? 'Parça ${s['Index']}'}';
-    Widget head(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-        child: Text(t, style: const TextStyle(color: kMuted, fontSize: 12, letterSpacing: 1.4)));
-    Widget opt(String t, bool sel, VoidCallback f, {String? sub}) => ListTile(
-          dense: true,
-          title: Text(t),
-          subtitle: sub != null ? Text(sub, style: const TextStyle(color: kMuted, fontSize: 11)) : null,
-          trailing: sel ? const Icon(Icons.check, color: kBlue) : null,
+    const head = TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1, color: Color(0x80F5F5F7));
+    const div = Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Divider(height: 1, thickness: 1, color: Color(0x14FFFFFF)));
+    Widget h(String t) => Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 8), child: Text(t, style: head));
+    Widget row(Widget left, {Widget? right, VoidCallback? onTap}) => Pressable(
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  onTap();
+                },
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: Colors.transparent,
+            child: Row(children: [Expanded(child: left), if (right != null) right]),
+          ),
+        );
+    Widget opt(String t, bool sel, VoidCallback f, {String? sub}) => row(
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(t, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            if (sub != null) Text(sub, style: const TextStyle(fontSize: 11, color: Color(0x80F5F5F7))),
+          ]),
+          right: sel ? const Icon(Icons.check_rounded, size: 18, color: Color(0xFFF5F5F7)) : null,
           onTap: f,
         );
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xF20B1024),
-      constraints: BoxConstraints(maxWidth: 720, maxHeight: MediaQuery.sizeOf(context).height * .9),
-      builder: (c) => SafeArea(
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: ListView(children: [
-              head('SES'),
-              for (final a in auds)
-                opt(lbl(a), a['Index'] == audioIdx, () {
-                  Navigator.pop(c);
-                  _selectAudio((a['Index'] as num).toInt());
-                }),
-              head('HIZ'),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Wrap(spacing: 6, children: [
-                  for (final s in [.75, 1.0, 1.25, 1.5, 2.0])
-                    ChoiceChip(
-                      label: Text('${s}x'),
-                      selected: speed == s,
-                      onSelected: (_) {
-                        speed = s;
-                        player.setRate(s);
-                        Navigator.pop(c);
-                      },
-                    ),
-                ]),
-              ),
-            ]),
+    Widget val(String t) => Text(t, style: const TextStyle(fontSize: 14, color: Color(0x8CF5F5F7)));
+    Widget step(IconData i, String l, VoidCallback f) => Semantics(
+          button: true,
+          label: l,
+          child: Pressable(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              f();
+            },
+            child: Container(
+              width: 28,
+              height: 28,
+              margin: const EdgeInsets.only(left: 6),
+              decoration: BoxDecoration(color: Colors.white.withAlpha(30), shape: BoxShape.circle),
+              child: Icon(i, size: 16, color: const Color(0xFFF5F5F7)),
+            ),
           ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: ListView(children: [
-              head('ALTYAZI'),
-              opt('Kapalı', subIdx == null, () {
-                Navigator.pop(c);
-                _selectSub(null);
-              }),
-              for (final s in subs)
-                opt(lbl(s), s['Index'] == subIdx, () {
-                  Navigator.pop(c);
-                  _selectSub((s['Index'] as num).toInt());
-                }, sub: s['IsTextSubtitleStream'] == true ? null : 'Resim altyazı — sunucu videoya gömer'),
-              StatefulBuilder(builder: (c2, set2) {
-                final ms = subDelay.inMilliseconds;
-                final lab = ms == 0 ? '0 sn' : '${ms > 0 ? '+' : ''}${(ms / 1000).toStringAsFixed(2)} sn';
-                void adj(int d) {
-                  set2(() => subDelay += Duration(milliseconds: d));
-                  _applyDelay();
-                }
-                return ListTile(
-                  dense: true,
-                  title: const Text('Altyazı zamanlaması'),
-                  subtitle: Text('$lab   (+ geç, − erken gösterir)', style: const TextStyle(color: kMuted, fontSize: 11)),
-                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => adj(-250)),
-                    IconButton(icon: const Icon(Icons.restart_alt), onPressed: () {
-                          set2(() => subDelay = Duration.zero);
-                          _applyDelay();
+        );
+    final ms = subDelay.inMilliseconds;
+    final delay = ms == 0 ? '0 sn' : '${ms > 0 ? '+' : '−'}${_num((ms.abs() / 1000))} sn';
+    void adj(int d) {
+      setState(() => subDelay += Duration(milliseconds: d));
+      _applyDelay();
+    }
+
+    final scr = MediaQuery.sizeOf(context);
+    final w = min(440.0, scr.width - 32);
+    return Positioned(
+      right: scr.width > 700 ? 52 : 16,
+      top: MediaQuery.paddingOf(context).top + 74,
+      width: w,
+      child: GestureDetector(
+        onTap: () {},
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: scr.height - MediaQuery.paddingOf(context).top - 90),
+          child: Container(
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.all(Radius.circular(22)),
+              boxShadow: [BoxShadow(color: Color(0x80000000), blurRadius: 50, offset: Offset(0, 20))],
+            ),
+            child: Glass(
+              radius: 22,
+              color: const Color(0xDB202026),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        h('SES'),
+                        for (final a in auds)
+                          opt(lbl(a), a['Index'] == audioIdx, () {
+                            setState(() => tracksOpen = false);
+                            _armHide();
+                            _selectAudio((a['Index'] as num).toInt());
+                          }),
+                        if (auds.isEmpty) row(val('Tek ses parçası')),
+                        div,
+                        row(const Text('Hız', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                            right: val('${_num(speed)}×'), onTap: () {
+                          final k = _speeds.indexOf(speed);
+                          speed = _speeds[(k + 1) % _speeds.length];
+                          player.setRate(speed);
+                          setState(() {});
                         }),
-                    IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => adj(250)),
-                  ]),
-                );
-              }),
-              ListTile(
-                dense: true,
-                leading: const Icon(Icons.download_outlined),
-                title: const Text('Altyazı ara ve indir'),
-                subtitle: const Text('Subtitle Downloader eklentisi', style: TextStyle(color: kMuted, fontSize: 11)),
-                onTap: () {
-                  Navigator.pop(c);
-                  _subSearch();
-                },
-              ),
-              head('BİLGİ'),
-              ListTile(
-                dense: true,
-                title: const Text('Akış bilgisi'),
-                subtitle: Text(_info(), style: const TextStyle(color: kMuted, fontSize: 11)),
-              ),
-              head('OTOMATİK ATLA'),
-              SwitchListTile(
-                dense: true,
-                title: const Text('Giriş ve jeneriği otomatik atla'),
-                value: api.autoSkip,
-                onChanged: (v) {
-                  api.autoSkip = v;
-                  Navigator.pop(c);
-                },
-              ),
-            ]),
+                        row(const Text('Gece modu', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                            right: SizedBox(
+                              height: 28,
+                              child: FittedBox(
+                                child: CupertinoSwitch(value: night, activeColor: const Color(0xFF34C759), onChanged: _setNight),
+                              ),
+                            )),
+                        row(const Text('Giriş/jenerik atla', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                            right: SizedBox(
+                              height: 28,
+                              child: FittedBox(
+                                child: CupertinoSwitch(
+                                    value: api.autoSkip,
+                                    activeColor: const Color(0xFF34C759),
+                                    onChanged: (v) => setState(() => api.autoSkip = v)),
+                              ),
+                            )),
+                        const SizedBox(height: 8),
+                      ]),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      decoration: const BoxDecoration(border: Border(left: BorderSide(color: Color(0x14FFFFFF)))),
+                      child: SingleChildScrollView(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        h('ALTYAZI'),
+                        opt('Kapalı', subIdx == null, () {
+                          setState(() => tracksOpen = false);
+                          _armHide();
+                          _selectSub(null);
+                        }),
+                        for (final x in subs)
+                          opt(lbl(x), x['Index'] == subIdx, () {
+                            setState(() => tracksOpen = false);
+                            _armHide();
+                            _selectSub((x['Index'] as num).toInt());
+                          }, sub: x['IsTextSubtitleStream'] == true ? null : 'Resim altyazı'),
+                        div,
+                        row(const Text('Zamanlama', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                            right: Row(mainAxisSize: MainAxisSize.min, children: [
+                              val(delay),
+                              step(Icons.remove_rounded, 'Altyazıyı erken göster', () => adj(-250)),
+                              step(Icons.add_rounded, 'Altyazıyı geç göster', () => adj(250)),
+                            ]),
+                            onTap: ms == 0
+                                ? null
+                                : () {
+                                    setState(() => subDelay = Duration.zero);
+                                    _applyDelay();
+                                  }),
+                        row(
+                          const Row(children: [
+                            Icon(Icons.search_rounded, size: 17, color: kAccent),
+                            SizedBox(width: 8),
+                            Flexible(
+                              child: Text('Altyazı ara ve indir',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kAccent)),
+                            ),
+                          ]),
+                          onTap: () {
+                            setState(() => tracksOpen = false);
+                            _subSearch();
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                      ]),
+                    ),
+                    ),
+                  ),
+                ]),
+            ),
           ),
-        ]),
+        ),
       ),
     );
-    _armHide();
   }
 
   static const _langs = {
@@ -768,7 +858,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xF20B1024),
+      backgroundColor: const Color(0xF2202026),
       constraints: BoxConstraints(maxWidth: 760, maxHeight: MediaQuery.sizeOf(context).height * .92),
       builder: (c) => StatefulBuilder(builder: (c, set) {
         Future<void> search() async {
@@ -841,61 +931,94 @@ class _PlayerScreenState extends State<PlayerScreen> {
           started = true;
           Future.microtask(search);
         }
-        const muted = TextStyle(color: kMuted, fontSize: 12);
+        const muted = TextStyle(color: Color(0x8CF5F5F7), fontSize: 12);
         return SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(c).bottom),
+            padding: EdgeInsets.fromLTRB(20, 4, 20, MediaQuery.viewInsetsOf(c).bottom),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Row(children: [
-                const Text('Altyazı ara', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                const Spacer(),
-                DropdownButton<String>(
-                  value: lang,
-                  dropdownColor: const Color(0xFF151B3A),
-                  underline: const SizedBox.shrink(),
-                  items: [for (final e in _langs.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-                  onChanged: (v) {
-                    if (v == null) return;
-                    lang = v;
-                    search();
-                  },
-                ),
-              ]),
-              const SizedBox(height: 6),
-              TextField(
+              const Text('Altyazı ara', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, letterSpacing: -.5)),
+              const SizedBox(height: 12),
+              CupertinoSearchTextField(
                 controller: q,
-                textInputAction: TextInputAction.search,
+                placeholder: 'Başlık (boş bırak: otomatik bulur)',
+                style: const TextStyle(color: Color(0xFFF5F5F7)),
+                backgroundColor: Colors.white.withAlpha(26),
                 onSubmitted: (_) => search(),
-                decoration: InputDecoration(
-                  hintText: 'Başlık (boş bırak: otomatik bulur)',
-                  isDense: true,
-                  filled: true,
-                  fillColor: Colors.white10,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                  suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: search),
-                ),
               ),
-              if (msg.isNotEmpty) Padding(padding: const EdgeInsets.all(14), child: Text(msg, style: muted)),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 34,
+                child: ListView(scrollDirection: Axis.horizontal, children: [
+                  for (final e in _langs.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Pressable(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          lang = e.key;
+                          search();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: lang == e.key ? kBlue : Colors.white.withAlpha(31),
+                            borderRadius: BorderRadius.circular(17),
+                          ),
+                          child: Text(e.value,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: lang == e.key ? kInk : const Color(0xFFF5F5F7))),
+                        ),
+                      ),
+                    ),
+                ]),
+              ),
+              if (msg == 'Aranıyor…')
+                const Padding(padding: EdgeInsets.all(24), child: CupertinoActivityIndicator())
+              else if (msg.isNotEmpty)
+                Padding(padding: const EdgeInsets.symmetric(vertical: 18), child: Text(msg, style: muted)),
               Expanded(
-                child: ListView.builder(
+                child: ListView.separated(
+                  padding: const EdgeInsets.only(top: 8, bottom: 12),
                   itemCount: res.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0x14FFFFFF)),
                   itemBuilder: (_, i) {
                     final x = res[i];
                     final tags = <String?>[
-                      x['IsHashMatch'] == true
-                          ? '⭐ Tam senkron'
-                          : (x['IsReleaseMatch'] == true ? '🎯 Sürüm eşleşti' : null),
+                      x['IsHashMatch'] == true ? 'Tam senkron' : (x['IsReleaseMatch'] == true ? 'Sürüm eşleşti' : null),
                       '${x['Provider'] ?? ''}',
                       '${x['LanguageName'] ?? x['Language'] ?? ''}',
                       if (x['HearingImpaired'] == true) 'İşitme engelli',
                       if (x['DownloadCount'] != null) '${x['DownloadCount']} indirme',
-                    ].whereType<String>().where((s) => s.isNotEmpty).join(' • ');
-                    return ListTile(
-                      dense: true,
-                      enabled: loadingId == null,
-                      title: Text('${x['ReleaseName'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis),
-                      subtitle: Text(loadingId == '${x['Id']}' ? 'İndiriliyor…' : tags, style: muted),
-                      onTap: () => download(x),
+                    ].whereType<String>().where((s) => s.isNotEmpty).join(' · ');
+                    final me = loadingId == '${x['Id']}';
+                    return Pressable(
+                      onTap: loadingId == null ? () => download(x) : null,
+                      child: Container(
+                        color: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        child: Row(children: [
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('${x['ReleaseName'] ?? ''}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 3),
+                              Text(tags,
+                                  style: x['IsHashMatch'] == true
+                                      ? const TextStyle(color: kAccent, fontSize: 12)
+                                      : muted),
+                            ]),
+                          ),
+                          const SizedBox(width: 10),
+                          me
+                              ? const CupertinoActivityIndicator()
+                              : const Icon(Icons.arrow_circle_down_rounded, size: 24, color: Color(0xB3F5F5F7)),
+                        ]),
+                      ),
                     );
                   },
                 ),
@@ -906,52 +1029,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }),
     );
     q.dispose();
-    _armHide();
-  }
-
-  Future<void> _episodesSheet() async {
-    hideT?.cancel();
-    final cur = it;
-    final season = cur?['ParentIndexNumber'];
-    final list = eps.where((e) => e['ParentIndexNumber'] == season).toList();
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xF20B1024),
-      constraints: BoxConstraints(maxWidth: 720, maxHeight: MediaQuery.sizeOf(context).height * .9),
-      builder: (c) => SafeArea(
-        child: ListView.builder(
-          itemCount: list.length,
-          itemBuilder: (_, i) {
-            final e = list[i];
-            final now = e['Id'] == cur?['Id'];
-            final tag = (e['ImageTags'] as Map?)?['Primary'];
-            return ListTile(
-              selected: now,
-              selectedTileColor: Colors.white10,
-              leading: SizedBox(
-                width: 96,
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                        color: kCard,
-                        child: tag != null ? netImg(api.image(e['Id'], 'Primary', tag: tag, w: 300)) : null),
-                  ),
-                ),
-              ),
-              title: Text('${e['IndexNumber'] ?? ''}. ${e['Name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(rt(e['RunTimeTicks']), style: const TextStyle(color: kMuted)),
-              onTap: () {
-                Navigator.pop(c);
-                if (!now) _start(e);
-              },
-            );
-          },
-        ),
-      ),
-    );
     _armHide();
   }
 
@@ -976,7 +1053,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
       backgroundColor: Colors.black,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => ui ? setState(() => ui = false) : _showUI(),
+        onTap: () {
+          if (viewOpen) return setState(() => viewOpen = false);
+          if (tracksOpen) {
+            setState(() => tracksOpen = false);
+            return _armHide();
+          }
+          ui ? setState(() => ui = false) : _showUI();
+        },
+        // solda yukarı/aşağı kaydır: ekran parlaklığı
+        onVerticalDragStart: (d) async {
+          if (d.localPosition.dx > MediaQuery.sizeOf(context).width / 2) return;
+          dragBright = true;
+          await _ensureBright();
+          if (mounted) setState(() => hud = true);
+        },
+        onVerticalDragUpdate: (d) {
+          if (!dragBright || bright == null) return;
+          _setBright(bright! - d.delta.dy / (MediaQuery.sizeOf(context).height * .7));
+          setState(() {});
+        },
+        onVerticalDragEnd: (_) {
+          dragBright = false;
+          hudT?.cancel();
+          hudT = Timer(const Duration(milliseconds: 900), () {
+            if (mounted) setState(() => hud = false);
+          });
+        },
         onDoubleTapDown: (d) => tapAt = d.localPosition,
         onDoubleTap: () => _seekBy(tapAt.dx < MediaQuery.sizeOf(context).width / 2 ? -10 : 10),
         child: Stack(children: [
@@ -998,7 +1101,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               bottom: (ui ? 110 : 30) + const [0.0, 50.0, 100.0][api.subLift.clamp(0, 2)],
               child: Center(child: subtitleText(cue)),
             ),
-          if (buffering && err.isEmpty) const Center(child: CircularProgressIndicator(color: Colors.white)),
+          if (buffering && err.isEmpty) const Center(child: CircularProgressIndicator.adaptive()),
           // yaş kartı
           if (i != null)
             Positioned(
@@ -1012,100 +1115,126 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
               ),
             ),
-          // kontroller
+          // kontroller (A · Cam)
           IgnorePointer(
             ignoring: !ui,
             child: AnimatedOpacity(
               opacity: ui ? 1 : 0,
               duration: const Duration(milliseconds: 250),
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xB3000000), Color(0x00000000), Color(0x00000000), Color(0xCC000000)],
-                    stops: [0, .25, .65, 1],
+                    colors: [
+                      const Color(0x99000000),
+                      const Color(0x33000000),
+                      const Color(0x33000000),
+                      epsOpen ? const Color(0xEB000000) : const Color(0xB3000000),
+                    ],
+                    stops: const [0, .3, .55, 1],
                   ),
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                     child: Column(children: [
                       Row(children: [
-                        IconButton(icon: const Icon(Icons.close, size: 28), onPressed: _close),
-                        const SizedBox(width: 6),
+                        GlassIcon(Icons.close_rounded, tooltip: 'Kapat', onTap: _close),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                             if (sub.isNotEmpty)
-                              Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFCFD5EA), fontSize: 13)),
+                              Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xB3F5F5F7), fontSize: 12)),
                           ]),
                         ),
-                        if (eps.length > 1) IconButton(icon: const Icon(Icons.video_library_outlined), tooltip: 'Bölümler', onPressed: _episodesSheet),
-                        IconButton(icon: const Icon(Icons.subtitles_outlined), tooltip: 'Ses ve altyazı', onPressed: _tracksSheet),
-                      ]),
-                      const Spacer(),
-                      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        IconButton(iconSize: 40, icon: const Icon(Icons.replay_10), onPressed: () => _seekBy(-10)),
-                        const SizedBox(width: 40),
-                        IconButton(
-                            iconSize: 64,
-                            icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                            onPressed: _togglePlay),
-                        const SizedBox(width: 40),
-                        IconButton(iconSize: 40, icon: const Icon(Icons.forward_10), onPressed: () => _seekBy(10)),
-                      ]),
-                      const Spacer(),
-                      LayoutBuilder(builder: (context, cs) => Stack(clipBehavior: Clip.none, children: [
-                      Row(children: [
-                        SizedBox(width: 62, child: Text(fmt(dragging ? Duration(milliseconds: (dragV * 1000).round()) : pos), style: const TextStyle(fontSize: 13))),
-                        Expanded(
-                          child: SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 3,
-                              activeTrackColor: Colors.white,
-                              inactiveTrackColor: Colors.white24,
-                              thumbColor: Colors.white,
-                              overlayShape: SliderComponentShape.noOverlay,
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                            ),
-                            child: Slider(
-                              value: curV.clamp(0, maxV).toDouble(),
-                              max: maxV,
-                              onChangeStart: (v) {
-                                hideT?.cancel();
-                                setState(() {
-                                  dragging = true;
-                                  dragV = v;
-                                });
-                              },
-                              onChanged: (v) => setState(() => dragV = v),
-                              onChangeEnd: (v) {
-                                player.seek(Duration(milliseconds: (v * 1000).round()));
-                                setState(() => dragging = false);
-                                _armHide();
-                              },
-                            ),
-                          ),
+                        Glass(
+                          radius: 24,
+                          padding: const EdgeInsets.all(4),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            if (epsOpen)
+                              _capBtn(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, playing ? 'Duraklat' : 'Oynat', _togglePlay),
+                            _capBtn(Icons.wb_sunny_outlined, 'Görüntü', _openView, on: viewOpen),
+                            _capBtn(Icons.subtitles_outlined, 'Ses ve altyazı', _toggleTracks, on: tracksOpen),
+                            if (eps.length > 1) _capBtn(Icons.video_library_outlined, 'Bölümler', _toggleEps, on: epsOpen),
+                          ]),
                         ),
-                        SizedBox(
-                            width: 70,
-                            child: Text('-${fmt(dur - pos)}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
                       ]),
-                      if (dragging && tp != null)
-                        Positioned(
-                          bottom: 30,
-                          left: (62 + 7 + (dragV / maxV).clamp(0.0, 1.0) * (cs.maxWidth - 62 - 70 - 14) - 90)
-                              .clamp(0.0, max(0.0, cs.maxWidth - 180)),
-                          child: IgnorePointer(child: _thumb(dragV)),
-                        ),
-                    ])),
+                      Expanded(
+                        child: epsOpen
+                            ? const SizedBox()
+                            : Center(
+                                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                  _seekBtn(-10),
+                                  const SizedBox(width: 52),
+                                  Semantics(
+                                    button: true,
+                                    label: playing ? 'Duraklat' : 'Oynat',
+                                    child: Pressable(
+                                      haptic: true,
+                                      onTap: _togglePlay,
+                                      child: Glass(
+                                        radius: 42,
+                                        color: const Color(0x7326262C),
+                                        child: SizedBox(
+                                          width: 84,
+                                          height: 84,
+                                          child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 44, color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 52),
+                                  _seekBtn(10),
+                                ]),
+                              ),
+                      ),
+                      _scrubber(maxV, curV),
+                      if (epsOpen) _epsStrip(),
                     ]),
                   ),
                 ),
               ),
             ),
           ),
+          // parlaklık göstergesi (solda kaydırınca)
+          Positioned(
+            left: 40,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: hud ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Glass(
+                    radius: 26,
+                    child: SizedBox(
+                      width: 52,
+                      height: 190,
+                      child: Stack(children: [
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: FractionallySizedBox(
+                            heightFactor: (bright ?? .5).clamp(0.0, 1.0),
+                            widthFactor: 1,
+                            child: Container(color: const Color(0xE6F5F5F7)),
+                          ),
+                        ),
+                        const Align(
+                          alignment: Alignment(0, .82),
+                          child: Icon(Icons.wb_sunny_rounded, size: 22, color: Color(0xFF6B6B73)),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (viewOpen) _viewPanel(),
+          if (tracksOpen && ui) _tracksPanel(),
           // giriş atla / sonraki bölüm
           Positioned(
             right: 40,
@@ -1132,7 +1261,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Flexible(child: SingleChildScrollView(child: SelectableText(err, textAlign: TextAlign.center))),
                 const SizedBox(height: 18),
-                FilledButton(onPressed: _close, child: const Text('Kapat')),
+                PillButton('Kapat', onTap: _close),
               ]),
             ),
         ]),
@@ -1140,47 +1269,359 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  Widget _pill(String t, VoidCallback f, {bool primary = false}) => Material(
-        color: primary ? const Color(0xFFF9F9F9) : const Color(0xB3000000),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-            side: BorderSide(color: primary ? Colors.transparent : Colors.white70, width: 1.5)),
-        child: InkWell(
-          onTap: f,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            child: Text(t,
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, letterSpacing: .6, color: primary ? Colors.black : Colors.white)),
+  Widget _pill(String t, VoidCallback f, {bool primary = false}) => Pressable(
+        haptic: true,
+        onTap: f,
+        child: primary
+            ? Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: kBlue, borderRadius: BorderRadius.circular(21)),
+                child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: kInk)),
+              )
+            : Glass(
+                radius: 21,
+                color: const Color(0x9926262C),
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  alignment: Alignment.center,
+                  child: Text(t, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.white)),
+                ),
+              ),
+      );
+
+  // =================== 3.0 oynatıcı parçaları ===================
+  Widget _capBtn(IconData i, String label, VoidCallback f, {bool on = false}) => Semantics(
+        button: true,
+        label: label,
+        child: Pressable(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            f();
+          },
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: on ? kBlue : Colors.transparent, borderRadius: BorderRadius.circular(19)),
+            child: Icon(i, size: 20, color: on ? kInk : Colors.white),
           ),
         ),
       );
 
-  Widget _ageCard(J i) {
-    final k = ageKey(i['OfficialRating']);
-    final ds = descs(i);
-    final g = ((i['Genres'] as List?) ?? const []).take(3).join(', ');
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 380),
-      padding: const EdgeInsets.fromLTRB(12, 10, 18, 10),
-      decoration: const BoxDecoration(
-        color: Color(0xA6000000),
-        border: Border(left: BorderSide(color: Colors.white, width: 4)),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (k != null) Padding(padding: const EdgeInsets.only(right: 8), child: AgeBadge(i['OfficialRating'], size: 38)),
-        for (final d in ds) Padding(padding: const EdgeInsets.only(right: 8), child: DescIcon(d, size: 38)),
-        Flexible(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(k != null ? kAgeText[k]! : '${i['OfficialRating'] ?? 'İçerik uyarısı'}',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-            if (ds.isNotEmpty)
-              Text(ds.map((d) => kDesc[d]).join(' • '), style: const TextStyle(color: Color(0xFFCFD5EA), fontSize: 12)),
-            if (g.isNotEmpty) Text(g, style: const TextStyle(color: Color(0xFFCFD5EA), fontSize: 12)),
+  Widget _seekBtn(int s) => Semantics(
+        button: true,
+        label: s < 0 ? '10 saniye geri' : '10 saniye ileri',
+        child: Pressable(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            _seekBy(s);
+          },
+          child: SizedBox(
+            width: 56,
+            height: 56,
+            child: Icon(s < 0 ? Icons.replay_10_rounded : Icons.forward_10_rounded, size: 42, color: Colors.white),
+          ),
+        ),
+      );
+
+  Widget _scrubber(double maxV, double curV) => LayoutBuilder(
+        builder: (context, cs) => Stack(clipBehavior: Clip.none, children: [
+          Column(mainAxisSize: MainAxisSize.min, children: [
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: dragging ? 8 : 4,
+                activeTrackColor: Colors.white,
+                inactiveTrackColor: Colors.white24,
+                thumbColor: Colors.white,
+                overlayShape: SliderComponentShape.noOverlay,
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: dragging ? 9 : 5),
+              ),
+              child: Slider(
+                value: curV.clamp(0, maxV).toDouble(),
+                max: maxV,
+                onChangeStart: (v) {
+                  hideT?.cancel();
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    dragging = true;
+                    dragV = v;
+                  });
+                },
+                onChanged: (v) => setState(() => dragV = v),
+                onChangeEnd: (v) {
+                  player.seek(Duration(milliseconds: (v * 1000).round()));
+                  setState(() => dragging = false);
+                  _armHide();
+                },
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text(fmt(dragging ? Duration(milliseconds: (dragV * 1000).round()) : pos),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xCCF5F5F7))),
+              Text('-${fmt(dur - pos)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xCCF5F5F7))),
+            ]),
+          ]),
+          if (dragging && tp != null)
+            Positioned(
+              bottom: 40,
+              left: ((dragV / maxV).clamp(0.0, 1.0) * (cs.maxWidth - 24) + 12 - 90).clamp(0.0, max(0.0, cs.maxWidth - 180)),
+              child: IgnorePointer(child: _thumb(dragV)),
+            ),
+        ]),
+      );
+
+  void _toggleEps() {
+    hideT?.cancel();
+    setState(() {
+      epsOpen = !epsOpen;
+      epsSeason = null;
+    });
+    if (!epsOpen) _armHide();
+  }
+
+  Widget _epsStrip() {
+    final seasons = eps.map((e) => e['ParentIndexNumber'] as num?).toSet().toList();
+    final s = epsSeason ?? (it?['ParentIndexNumber'] as num?);
+    final list = eps.where((e) => e['ParentIndexNumber'] == s).toList();
+    return SizedBox(
+      height: 196,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 32,
+          child: ListView(scrollDirection: Axis.horizontal, children: [
+            for (final x in seasons)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Pressable(
+                  onTap: () => setState(() => epsSeason = x),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: x == s ? kBlue : Colors.white.withAlpha(26),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(x == null || x == 0 ? 'Özel' : '$x. Sezon',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: x == s ? kInk : Colors.white)),
+                  ),
+                ),
+              ),
           ]),
         ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, k) {
+              final e = list[k];
+              final now = e['Id'] == it?['Id'];
+              final ud = (e['UserData'] as Map?) ?? const {};
+              final seen = ud['Played'] == true;
+              final run = (e['RunTimeTicks'] as num?) ?? 0;
+              final pt = (ud['PlaybackPositionTicks'] as num?) ?? 0;
+              final frac = now
+                  ? (dur.inMilliseconds > 0 ? pos.inMilliseconds / dur.inMilliseconds : 0.0)
+                  : (seen ? 1.0 : (run > 0 ? pt / run : 0.0));
+              final tag = (e['ImageTags'] as Map?)?['Primary'];
+              return Pressable(
+                onTap: () {
+                  if (now) return;
+                  setState(() => epsOpen = false);
+                  _start(e, restart: seen);
+                },
+                child: SizedBox(
+                  width: 176,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Container(
+                      width: 176,
+                      height: 99,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: kCard,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: now ? Colors.white : Colors.white12, width: now ? 2 : 1),
+                      ),
+                      child: Stack(fit: StackFit.expand, children: [
+                        if (tag != null) netImg(api.image('${e['Id']}', 'Primary', tag: '$tag', w: 360)),
+                        if (now)
+                          Positioned(
+                            left: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(color: kBlue, borderRadius: BorderRadius.circular(10)),
+                              child: const Text('Oynatılıyor', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kInk)),
+                            ),
+                          ),
+                        if (seen && !now)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(color: const Color(0xBF26262C), borderRadius: BorderRadius.circular(11)),
+                              child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                            ),
+                          ),
+                        Align(
+                          alignment: Alignment.bottomLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: frac.clamp(0.0, 1.0).toDouble(),
+                            child: Container(height: 3, color: Colors.white),
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 6),
+                    Text('${e['IndexNumber'] ?? ''}. ${e['Name'] ?? ''}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(rt(e['RunTimeTicks']), style: const TextStyle(fontSize: 11, color: Color(0x8CF5F5F7))),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ),
       ]),
+    );
+  }
+
+  Future<void> _ensureBright() async {
+    if (bright != null) return;
+    try {
+      bright = await ScreenBrightness().current;
+    } catch (_) {
+      bright = .5;
+    }
+  }
+
+  Future<void> _setBright(double v) async {
+    bright = v.clamp(0.0, 1.0);
+    brightTouched = true;
+    try {
+      await ScreenBrightness().setScreenBrightness(bright!);
+    } catch (_) {}
+  }
+
+  void _eq(String k, double v) {
+    eq[k] = v;
+    try {
+      (player.platform as dynamic).setProperty(k, '${v.round()}');
+    } catch (_) {}
+  }
+
+  Future<void> _openView() async {
+    hideT?.cancel();
+    await _ensureBright();
+    if (!mounted) return;
+    setState(() {
+      viewOpen = true;
+      ui = false;
+    });
+  }
+
+  Future<void> _resetView() async {
+    for (final k in eq.keys.toList()) {
+      _eq(k, 0);
+    }
+    if (brightTouched) {
+      try {
+        await ScreenBrightness().resetScreenBrightness();
+      } catch (_) {}
+      brightTouched = false;
+      bright = null;
+      await _ensureBright();
+    }
+    if (mounted) setState(() {});
+  }
+
+  Widget _viewSlider(String label, String value, double v, double lo, double hi, ValueChanged<double> f) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(value, style: const TextStyle(fontSize: 13, color: Color(0x99F5F5F7))),
+          ]),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 6,
+              activeTrackColor: Colors.white,
+              inactiveTrackColor: Colors.white24,
+              thumbColor: Colors.white,
+              overlayShape: SliderComponentShape.noOverlay,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+            ),
+            child: Slider(value: v.clamp(lo, hi), min: lo, max: hi, onChanged: f),
+          ),
+        ]),
+      );
+
+  Widget _viewPanel() {
+    String sign(double v) => v > 0 ? '+${v.round()}' : '${v.round()}';
+    return Positioned(
+      right: 16,
+      top: 12,
+      bottom: 12,
+      width: 320,
+      child: SafeArea(
+        left: false,
+        child: GestureDetector(
+          onTap: () {},
+          child: Glass(
+            radius: 26,
+            color: const Color(0xD920202A),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+            child: ListView(padding: EdgeInsets.zero, children: [
+              Row(children: [
+                const Expanded(child: Text('Görüntü', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+                Pressable(
+                  onTap: _resetView,
+                  child: Container(
+                    height: 30,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Colors.white.withAlpha(26), borderRadius: BorderRadius.circular(15)),
+                    child: const Text('Sıfırla', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              const Text('EKRAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1, color: Color(0x80F5F5F7))),
+              const SizedBox(height: 6),
+              _viewSlider('Ekran parlaklığı', '%${((bright ?? .5) * 100).round()}', bright ?? .5, 0, 1, (v) {
+                _setBright(v);
+                setState(() {});
+              }),
+              const SizedBox(height: 4),
+              const Text('VİDEO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1, color: Color(0x80F5F5F7))),
+              const SizedBox(height: 6),
+              for (final k in eq.keys)
+                _viewSlider(_eqNames[k]!, sign(eq[k]!), eq[k]!, -50, 50, (v) {
+                  _eq(k, v);
+                  setState(() {});
+                }),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _ageCard(J i) {
+    final a = ageLabel(i['OfficialRating']);
+    final ds = descs(i);
+    final line = [if (a != null) a, ...ds.map((d) => kDesc[d]!)].join(' · ');
+    return Glass(
+      radius: 14,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      child: Text(line, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
     );
   }
 }

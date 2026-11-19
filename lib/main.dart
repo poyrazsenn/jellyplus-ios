@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
@@ -11,9 +12,11 @@ import 'downloads.dart';
 import 'downloads_screen.dart';
 import 'home.dart';
 import 'library.dart';
+import 'nav.dart';
 import 'player.dart' show subtitleText;
 import 'scan.dart';
 import 'search.dart';
+import 'settings.dart';
 import 'seerr.dart';
 import 'theme_music.dart';
 import 'update.dart';
@@ -56,14 +59,56 @@ class JellyPlus extends StatelessWidget {
       start = const LoginScreen();
     }
     return MaterialApp(
-      title: 'Jelly+',
+      title: 'Poyraz Player',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: kBg,
-        colorScheme: const ColorScheme.dark(primary: kBlue, surface: Color(0xFF0E1328)),
-        appBarTheme: const AppBarTheme(backgroundColor: kBg, elevation: 0, scrolledUnderElevation: 0),
+        colorScheme: const ColorScheme.dark(primary: kBlue, onPrimary: kInk, secondary: kBlue, onSecondary: kInk, secondaryContainer: kBlue, onSecondaryContainer: kInk, surface: kSheet),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: kBg,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFFF5F5F7)),
+        ),
         useMaterial3: true,
+        // iOS hissi: dalga efekti yok, iOS sayfa geçişleri, yuvarlak sayfalar, kapsül düğmeler
+        splashFactory: NoSplash.splashFactory,
+        highlightColor: const Color(0x14FFFFFF),
+        canvasColor: kBg,
+        pageTransitionsTheme: const PageTransitionsTheme(builders: {
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        }),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: kSheet,
+          modalBackgroundColor: kSheet,
+          showDragHandle: true,
+          dragHandleColor: Color(0x4DF5F5F7),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xF22C2C32),
+          contentTextStyle: const TextStyle(color: Color(0xFFF5F5F7), fontSize: 14),
+          actionTextColor: kAccent,
+          shape: const StadiumBorder(),
+          insetPadding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
+          elevation: 0,
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(backgroundColor: kBlue, foregroundColor: kInk, shape: const StadiumBorder()),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white, side: const BorderSide(color: Colors.white24), shape: const StadiumBorder()),
+        ),
+        textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: Colors.white)),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(color: Colors.white),
+        dividerTheme: const DividerThemeData(color: Color(0x14FFFFFF)),
+        listTileTheme: const ListTileThemeData(iconColor: Color(0xCCF5F5F7)),
+        chipTheme: const ChipThemeData(shape: StadiumBorder(), side: BorderSide(color: Colors.white24), showCheckmark: false, selectedColor: kBlue, secondaryLabelStyle: TextStyle(color: kInk, fontWeight: FontWeight.w600)),
       ),
       home: start,
     );
@@ -102,50 +147,54 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  InputDecoration deco(String l) => InputDecoration(
-        labelText: l,
-        filled: true,
-        fillColor: Colors.white.withAlpha(20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-      );
-
   @override
   Widget build(BuildContext context) {
     final canBack = Navigator.of(context).canPop();
     return Scaffold(
-      appBar: canBack ? AppBar() : null,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                const Center(child: Logo(size: 44)),
-                const SizedBox(height: 32),
-                TextField(controller: srv, decoration: deco('Sunucu adresi'), keyboardType: TextInputType.url, autocorrect: false),
-                const SizedBox(height: 12),
-                TextField(controller: usr, decoration: deco('Kullanıcı adı'), autocorrect: false, textCapitalization: TextCapitalization.none),
-                const SizedBox(height: 12),
-                TextField(controller: pwd, decoration: deco('Şifre'), obscureText: true, onSubmitted: (_) => go()),
-                if (err.isNotEmpty)
-                  Padding(padding: const EdgeInsets.only(top: 14), child: Text(err, style: const TextStyle(color: Color(0xFFFF8A8A)))),
-                const SizedBox(height: 22),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                      backgroundColor: kBlue,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                  onPressed: busy ? null : go,
-                  child: busy
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('GİRİŞ YAP', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.4, color: Colors.white)),
-                ),
-              ]),
+      backgroundColor: kBg,
+      body: Stack(children: [
+        Container(
+          height: 420,
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(center: Alignment(.6, -1), radius: 1.1, colors: [Color(0x40FFD6AA), Color(0x00FFD6AA)]),
+          ),
+        ),
+        SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const Center(child: PMark(size: 72)),
+                  const SizedBox(height: 18),
+                  const Text('Poyraz Player', textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -.8)),
+                  const SizedBox(height: 6),
+                  const Text('Jellyfin sunucuna giriş yap', textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 15, color: Color(0x99F5F5F7))),
+                  const SizedBox(height: 30),
+                  IosField(srv, 'Sunucu adresi', keyboardType: TextInputType.url, action: TextInputAction.next),
+                  const SizedBox(height: 10),
+                  IosField(usr, 'Kullanıcı adı', action: TextInputAction.next),
+                  const SizedBox(height: 10),
+                  IosField(pwd, 'Şifre', obscure: true, action: TextInputAction.go, onSubmitted: (_) => go()),
+                  if (err.isNotEmpty)
+                    Padding(padding: const EdgeInsets.only(top: 14), child: Text(err, style: const TextStyle(color: Color(0xFFFF8A8A)))),
+                  const SizedBox(height: 22),
+                  PillButton('Giriş yap', height: 54, expand: true, busy: busy, onTap: go),
+                ]),
+              ),
             ),
           ),
         ),
-      ),
+        if (canBack)
+          Positioned(
+            left: 14,
+            top: MediaQuery.paddingOf(context).top + 8,
+            child: GlassIcon(Icons.arrow_back_ios_new_rounded, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
+          ),
+      ]),
     );
   }
 }
@@ -159,7 +208,7 @@ class ProfilesScreen extends StatefulWidget {
 
 class _ProfilesScreenState extends State<ProfilesScreen> {
   bool edit = false;
-  static const colors = [Color(0xFF0063E5), Color(0xFFE5484D), Color(0xFF30A46C), Color(0xFFD98E04), Color(0xFF8E4EC6), Color(0xFF12A594)];
+  static const colors = [Color(0xFF3E5C77), Color(0xFF6B5A48), Color(0xFF2E4B3C), Color(0xFF4A3F6B), Color(0xFF5B3A2E), Color(0xFF3A3F57)];
 
   Future<void> pick(Account a) async {
     final api = Api.I;
@@ -195,20 +244,22 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     final acc = Api.I.accounts;
     final size = MediaQuery.sizeOf(context).width > 700 ? 120.0 : 92.0;
     return Scaffold(
+      backgroundColor: kBg,
       body: Container(
         decoration: const BoxDecoration(
-            gradient: RadialGradient(center: Alignment.topCenter, radius: 1.3, colors: [Color(0xFF1B2A5C), kBg])),
+            gradient: RadialGradient(center: Alignment(.5, -1.1), radius: 1.2, colors: [Color(0x38FFD6AA), Color(0x000B0B0D)])),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(children: [
                 Text(edit ? 'Profilleri düzenle' : 'Kim izliyor?',
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -.8)),
                 const SizedBox(height: 32),
                 Wrap(spacing: 22, runSpacing: 22, alignment: WrapAlignment.center, children: [
                   for (var i = 0; i < acc.length; i++)
-                    GestureDetector(
+                    Pressable(
+                      haptic: true,
                       onTap: () => pick(acc[i]),
                       child: SizedBox(
                         width: size + 10,
@@ -240,11 +291,11 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                               ),
                           ]),
                           const SizedBox(height: 10),
-                          Text(acc[i].name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, color: Color(0xFFCFD5EA))),
+                          Text(acc[i].name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, color: Color(0xB8F5F5F7))),
                         ]),
                       ),
                     ),
-                  GestureDetector(
+                  Pressable(
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
                     child: SizedBox(
                       width: size + 10,
@@ -254,16 +305,19 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                             backgroundColor: Colors.white.withAlpha(20),
                             child: Icon(Icons.add, size: size * .4, color: Colors.white)),
                         const SizedBox(height: 10),
-                        const Text('Profil ekle', style: TextStyle(fontSize: 15, color: Color(0xFFCFD5EA))),
+                        const Text('Profil ekle', style: TextStyle(fontSize: 15, color: Color(0xB8F5F5F7))),
                       ]),
                     ),
                   ),
                 ]),
                 const SizedBox(height: 34),
-                OutlinedButton(
-                  onPressed: () => setState(() => edit = !edit),
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38)),
-                  child: Text(edit ? 'Bitti' : 'Profilleri düzenle'),
+                Pressable(
+                  onTap: () => setState(() => edit = !edit),
+                  child: Glass(
+                    radius: 22,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                    child: Text(edit ? 'Bitti' : 'Profilleri düzenle', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
                 ),
               ]),
             ),
@@ -294,6 +348,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    tabBus.addListener(_onTabBus);
     // Netflix gibi: internet kesildiği an İndirilenler'e geç
     Connectivity().checkConnectivity().then((r) {
       if (_isOff(r)) _goOffline();
@@ -323,9 +378,81 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     });
   }
 
+  void _goTab(int i) {
+    if (i == tab) {
+      keys[i].currentState?.popUntil((r) => r.isFirst);
+    } else {
+      ThemeMusic.I.stop();
+      setState(() => tab = i);
+    }
+  }
+
+  void _onTabBus() {
+    final t = tabBus.value;
+    if (t == null) return;
+    tabBus.value = null;
+    _goTab(t);
+  }
+
+  /// A · Cam: ekranın altında havada duran buğulu cam şerit. Profil sağ üstteki düğmeden açılır.
+  Widget _glassBar(BuildContext context) {
+    const items = [
+      [Icons.home_outlined, Icons.home_rounded, 'Ana sayfa'],
+      [Icons.search_rounded, Icons.search_rounded, 'Ara'],
+      [Icons.bookmark_border_rounded, Icons.bookmark_rounded, 'Listem'],
+      [Icons.download_outlined, Icons.download_rounded, 'İndirilenler'],
+    ];
+    final wide = MediaQuery.sizeOf(context).width > 700;
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 10),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: wide ? 460 : 420),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+            child: Glass(
+              radius: 32,
+              color: const Color(0xC726262C),
+              child: SizedBox(
+                height: 62,
+                child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                  for (var i = 0; i < items.length; i++)
+                    Semantics(
+                      button: true,
+                      selected: tab == i,
+                      label: items[i][2] as String,
+                      child: Pressable(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          _goTab(i);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 58,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: tab == i ? Colors.white.withAlpha(42) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Icon((tab == i ? items[i][1] : items[i][0]) as IconData,
+                              size: 25, color: tab == i ? Colors.white : const Color(0x99F5F5F7)),
+                        ),
+                      ),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    tabBus.removeListener(_onTabBus);
     _net?.cancel();
     super.dispose();
   }
@@ -390,8 +517,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             child: offline
                 ? Container(
                     width: double.infinity,
-                    color: const Color(0xFF2A2F3D),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.fromLTRB(20, 0, 20, 2),
+                    decoration: BoxDecoration(color: const Color(0xFF26262C), borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     child: Row(children: [
                       const Icon(Icons.cloud_off, size: 16, color: Colors.white70),
                       const SizedBox(width: 8),
@@ -404,238 +532,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   )
                 : const SizedBox(width: double.infinity),
           ),
-          Theme(
-          data: Theme.of(context).copyWith(splashColor: Colors.transparent, highlightColor: Colors.transparent),
-          child: BottomNavigationBar(
-            currentIndex: tab,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: kBar,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: const Color(0xFF8A93AE),
-            selectedFontSize: 11,
-            unselectedFontSize: 11,
-            onTap: (i) {
-              if (i == tab) {
-                keys[i].currentState?.popUntil((r) => r.isFirst);
-              } else {
-                ThemeMusic.I.stop();
-                setState(() => tab = i);
-              }
-            },
-            items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Ana sayfa'),
-              BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Ara'),
-              BottomNavigationBarItem(icon: Icon(Icons.add), activeIcon: Icon(Icons.check), label: 'Listem'),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.download_for_offline_outlined),
-                  activeIcon: Icon(Icons.download_for_offline),
-                  label: 'İndirilenler'),
-              BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
-            ],
-          ),
-        ),
+          _glassBar(context),
         ]),
       ),
     );
   }
 }
 
-// ======================= Profil / Ayarlar =======================
-const kSubLangs = {
-  'off': 'Kapalı',
-  'tr': 'Türkçe',
-  'en': 'English',
-  'de': 'Almanca',
-  'fr': 'Fransızca',
-  'es': 'İspanyolca',
-  'it': 'İtalyanca',
-  'pt': 'Portekizce',
-  'ru': 'Rusça',
-  'ar': 'Arapça',
-  'fa': 'Farsça',
-};
-
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  final api = Api.I;
-
-  void toRoot(Widget w) => Navigator.of(context, rootNavigator: true)
-      .pushAndRemoveUntil(MaterialPageRoute(builder: (_) => w), (_) => false);
-
-  Future<void> chooseLang() async {
-    final v = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF0E1328),
-      builder: (c) => SafeArea(
-        child: ListView(shrinkWrap: true, children: [
-          const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Otomatik altyazı dili', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
-          for (final e in kSubLangs.entries)
-            ListTile(
-              title: Text(e.value),
-              trailing: e.key == api.subLang ? const Icon(Icons.check, color: kBlue) : null,
-              onTap: () => Navigator.pop(c, e.key),
-            ),
-        ]),
-      ),
-    );
-    if (v != null) setState(() => api.subLang = v);
-  }
-
-  Widget _head(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
-        child: Text(t, style: const TextStyle(color: kMuted, fontSize: 12, letterSpacing: 1.4)),
-      );
-
-  Widget _choice(String label, List<String> opts, int cur, void Function(int) set) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-        child: Row(children: [
-          SizedBox(width: 78, child: Text(label)),
-          Expanded(
-            child: Wrap(spacing: 6, runSpacing: 4, children: [
-              for (var i = 0; i < opts.length; i++)
-                ChoiceChip(
-                  label: Text(opts[i], style: const TextStyle(fontSize: 12)),
-                  selected: cur == i,
-                  onSelected: (_) => setState(() => set(i)),
-                ),
-            ]),
-          ),
-        ]),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
-      body: ListView(children: [
-        ListTile(
-          leading: CircleAvatar(
-            backgroundColor: kBlue,
-            child: Text(api.name.isEmpty ? '?' : api.name[0].toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-          ),
-          title: Text(api.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(api.url, style: const TextStyle(color: kMuted)),
-        ),
-        const Divider(),
-        ListTile(
-          leading: const Icon(Icons.switch_account),
-          title: const Text('Profil değiştir'),
-          onTap: () => toRoot(const ProfilesScreen()),
-        ),
-        const Divider(),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 10, 16, 4),
-          child: Text('OYNATMA', style: TextStyle(color: kMuted, fontSize: 12, letterSpacing: 1.4)),
-        ),
-        ListTile(
-          leading: const Icon(Icons.subtitles_outlined),
-          title: const Text('Otomatik altyazı dili'),
-          subtitle: Text(kSubLangs[api.subLang] ?? api.subLang, style: const TextStyle(color: kMuted)),
-          onTap: chooseLang,
-        ),
-        ListTile(
-          leading: const Icon(Icons.format_size),
-          title: const Text('Altyazı boyutu'),
-          subtitle: Slider(
-            value: api.subSize.clamp(.7, 1.8),
-            min: .7,
-            max: 1.8,
-            divisions: 11,
-            label: '${(api.subSize * 100).round()}%',
-            onChanged: (v) => setState(() => api.subSize = v),
-          ),
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.fast_forward_outlined),
-          title: const Text('Giriş ve jeneriği otomatik atla'),
-          value: api.autoSkip,
-          onChanged: (v) => setState(() => api.autoSkip = v),
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.skip_next_outlined),
-          title: const Text('Sonraki bölümü otomatik başlat'),
-          subtitle: const Text('Jenerikte 10 saniyelik geri sayım', style: TextStyle(color: kMuted)),
-          value: api.autoNext,
-          onChanged: (v) => setState(() => api.autoNext = v),
-        ),
-        _head('ALTYAZI GÖRÜNÜMÜ'),
-        Container(
-          height: 90,
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          alignment: Alignment(0, [0.75, 0.25, -0.25][api.subLift.clamp(0, 2)]),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            gradient: const LinearGradient(colors: [Color(0xFF2A3B5C), Color(0xFF6B7C93), Color(0xFF34404F)]),
-          ),
-          child: subtitleText('Altyazı böyle görünecek', scale: .75),
-        ),
-        _choice('Renk', ['Beyaz', 'Sarı'], api.subColor, (v) => api.subColor = v),
-        _choice('Arka plan', ['Gölge', 'Yarı saydam', 'Siyah kutu'], api.subBg, (v) => api.subBg = v),
-        _choice('Konum', ['Alt', 'Biraz yukarı', 'Yukarı'], api.subLift, (v) => api.subLift = v),
-        if (api.admin) ...[
-          _head('SUNUCU'),
-          const ScanTile(),
-        ],
-        _head('İNDİRMELER'),
-        SwitchListTile(
-          secondary: const Icon(Icons.auto_delete_outlined),
-          title: const Text('İzleyince sil'),
-          subtitle: const Text('İzlenen indirmeler oynatıcı kapanınca silinir', style: TextStyle(color: kMuted)),
-          value: Downloads.I.autoDelete,
-          onChanged: (v) => setState(() => Downloads.I.autoDelete = v),
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.cloud_download_outlined),
-          title: const Text('Arka planda indir'),
-          subtitle: const Text('Telefon kilitliyken ve uygulama kapalıyken de sürer. Sorun olursa kapat; 2.0\'daki gibi uygulama açıkken iner.',
-              style: TextStyle(color: kMuted)),
-          value: Downloads.I.bgOn,
-          onChanged: (v) => setState(() => Downloads.I.bgOn = v),
-        ),
-        _head('İSTEKLER (SEERR)'),
-        if (Seerr.I.on)
-          ListTile(
-            leading: const Icon(Icons.playlist_add_check),
-            title: const Text('İsteklerim'),
-            subtitle: const Text('Bekliyor / indiriliyor / hazır', style: TextStyle(color: kMuted)),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RequestsScreen())),
-          ),
-        ListTile(
-          leading: const Icon(Icons.link),
-          title: const Text('Seerr bağlantısı'),
-          subtitle: Text(Seerr.I.on ? Seerr.I.url : 'Bağlı değil', style: const TextStyle(color: kMuted)),
-          onTap: () async {
-            await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SeerrSettingsScreen()));
-            if (mounted) setState(() {});
-          },
-        ),
-        const Divider(),
-        ListTile(
-          leading: const Icon(Icons.new_releases_outlined),
-          title: const Text('Bu sürümdeki yenilikler'),
-          onTap: () => showWhatsNew(context, force: true),
-        ),
-        const Divider(),
-        ListTile(
-          leading: const Icon(Icons.logout, color: Color(0xFFFF8A8A)),
-          title: const Text('Çıkış yap', style: TextStyle(color: Color(0xFFFF8A8A))),
-          onTap: () async {
-            await api.logout();
-            toRoot(api.accounts.isNotEmpty ? const ProfilesScreen() : const LoginScreen());
-          },
-        ),
-        const SizedBox(height: 20),
-        const Center(child: Text('Jelly+ iOS $kVersion', style: TextStyle(color: kMuted, fontSize: 12))),
-        const SizedBox(height: 30),
-      ]),
-    );
-  }
-}

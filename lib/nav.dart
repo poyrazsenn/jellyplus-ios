@@ -36,3 +36,6 @@ Future<void> openPlayer(BuildContext c, J it, {bool restart = false}) async {
       fullscreenDialog: true, builder: (_) => PlayerScreen(item: it, restart: restart)));
   refreshBus.value++;
 }
+
+/// Kabuktaki sekmeyi başka ekrandan değiştirmek için (ör. ana sayfadaki profil düğmesi → Profil).
+final tabBus = ValueNotifier<int?>(null);

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -174,37 +175,43 @@ class _SeerrResultTileState extends State<SeerrResultTile> {
     final year = '${r['releaseDate'] ?? r['firstAirDate'] ?? ''}'.split('-').first;
     final img = Seerr.poster(r['posterPath']);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
           child: Container(
-            width: 52,
-            height: 78,
+            width: 40,
+            height: 60,
             color: kCard,
-            child: img.isEmpty ? const Icon(Icons.movie_outlined, color: kMuted) : CachedNetworkImage(imageUrl: img, fit: BoxFit.cover),
+            child: img.isEmpty ? const Icon(Icons.movie_outlined, size: 18, color: kMuted) : CachedNetworkImage(imageUrl: img, fit: BoxFit.cover),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${r['title'] ?? r['name'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('${r['title'] ?? r['name'] ?? ''}',
+                maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             const SizedBox(height: 3),
-            Text([if (year.isNotEmpty) year, r['mediaType'] == 'tv' ? 'Dizi' : 'Film'].join(' • '),
-                style: const TextStyle(color: kMuted, fontSize: 12)),
+            Text([r['mediaType'] == 'tv' ? 'Dizi' : 'Film', if (year.isNotEmpty) year].join(' · '),
+                style: const TextStyle(color: Color(0x8CF5F5F7), fontSize: 12)),
           ]),
         ),
         const SizedBox(width: 8),
         if (st <= 1)
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kBlue, padding: const EdgeInsets.symmetric(horizontal: 16)),
-            onPressed: busy ? null : ask,
-            child: busy
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('İste', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          Pressable(
+            onTap: busy ? null : ask,
+            child: Container(
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: kBlue, borderRadius: BorderRadius.circular(16)),
+              child: busy
+                  ? const CupertinoActivityIndicator(radius: 8, color: kInk)
+                  : const Text('İste', style: TextStyle(color: kInk, fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
           )
         else
-          Text(s.text, style: TextStyle(color: s.color, fontWeight: FontWeight.w600, fontSize: 12)),
+          Text(s.text, style: const TextStyle(color: kAccent, fontWeight: FontWeight.w600, fontSize: 12)),
       ]),
     );
   }
@@ -264,76 +271,92 @@ class _RequestsScreenState extends State<RequestsScreen> {
   @override
   Widget build(BuildContext context) {
     final l = list;
+    final pad = hPad(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('İsteklerim')),
-      body: err.isNotEmpty
-          ? ErrorView(err, retry: load)
-          : l == null
-              ? const Loading()
-              : RefreshIndicator(
-                  onRefresh: load,
-                  child: l.isEmpty
-                      ? ListView(children: const [
-                          Padding(
-                            padding: EdgeInsets.all(40),
-                            child: Text('Henüz istek yok. Ara sekmesinde sunucuda olmayan bir film arayınca "İste" çıkar.',
-                                textAlign: TextAlign.center, style: TextStyle(color: kMuted)),
-                          ),
-                        ])
-                      : ListView.separated(
-                          padding: EdgeInsets.symmetric(horizontal: hPad(context), vertical: 8),
-                          itemCount: l.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (_, i) {
-                            final x = l[i];
-                            final m = x['media'] as Map?;
-                            final s = Seerr.status(m, (x['status'] as num?)?.toInt());
-                            final img = Seerr.poster(x['_poster']);
-                            final type = (m?['mediaType'] ?? x['type']) == 'tv' ? 'Dizi' : 'Film';
-                            final when = DateTime.tryParse('${x['createdAt'] ?? ''}')?.toLocal();
-                            return InkWell(
-                              onTap: () => open(x),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                child: Row(children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: Container(
-                                      width: 52,
-                                      height: 78,
-                                      color: kCard,
-                                      child: img.isEmpty ? null : CachedNetworkImage(imageUrl: img, fit: BoxFit.cover),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                      Text('${x['_title'] ?? 'TMDB ${m?['tmdbId'] ?? ''}'}',
-                                          maxLines: 2, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                          [
-                                            if ('${x['_year'] ?? ''}'.isNotEmpty) '${x['_year']}',
-                                            type,
-                                            if (when != null) '${when.day}.${when.month}.${when.year} istendi',
-                                          ].join(' • '),
-                                          style: const TextStyle(color: kMuted, fontSize: 12)),
-                                      const SizedBox(height: 6),
-                                      Text(s.text, style: TextStyle(color: s.color, fontWeight: FontWeight.w700, fontSize: 13)),
-                                      if (s.frac != null)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 6),
-                                          child: LinearProgressIndicator(
-                                              value: s.frac, minHeight: 3, color: kBlue, backgroundColor: Colors.white12),
-                                        ),
-                                    ]),
-                                  ),
-                                ]),
-                              ),
-                            );
-                          },
-                        ),
+      backgroundColor: kBg,
+      body: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          iosNav('İsteklerim', back: 'Profil'),
+          CupertinoSliverRefreshControl(onRefresh: load),
+          if (err.isNotEmpty)
+            SliverFillRemaining(hasScrollBody: false, child: ErrorView(err, retry: load))
+          else if (l == null)
+            const SliverFillRemaining(hasScrollBody: false, child: Loading())
+          else if (l.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(40, 0, 40, 120),
+                child: Center(
+                  child: Text('Henüz istek yok. Ara sekmesinde sunucuda olmayan bir film arayınca "İste" çıkar.',
+                      textAlign: TextAlign.center, style: TextStyle(color: Color(0x8CF5F5F7), height: 1.4)),
                 ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 4, pad, 40),
+              sliver: SliverList.separated(
+                itemCount: l.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) {
+                  final x = l[i];
+                  final m = x['media'] as Map?;
+                  final s = Seerr.status(m, (x['status'] as num?)?.toInt());
+                  final img = Seerr.poster(x['_poster']);
+                  final type = (m?['mediaType'] ?? x['type']) == 'tv' ? 'Dizi' : 'Film';
+                  final when = DateTime.tryParse('${x['createdAt'] ?? ''}')?.toLocal();
+                  return Pressable(
+                    onTap: () => open(x),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.white.withAlpha(13), borderRadius: BorderRadius.circular(16)),
+                      child: Row(children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 52,
+                            height: 78,
+                            color: kCard,
+                            child: img.isEmpty ? null : CachedNetworkImage(imageUrl: img, fit: BoxFit.cover),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('${x['_title'] ?? 'TMDB ${m?['tmdbId'] ?? ''}'}',
+                                maxLines: 2, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 3),
+                            Text(
+                                [
+                                  type,
+                                  if ('${x['_year'] ?? ''}'.isNotEmpty) '${x['_year']}',
+                                  if (when != null) '${when.day}.${when.month}.${when.year} istendi',
+                                ].join(' · '),
+                                style: const TextStyle(color: Color(0x8CF5F5F7), fontSize: 12)),
+                            const SizedBox(height: 6),
+                            Text(s.text, style: const TextStyle(color: kAccent, fontWeight: FontWeight.w600, fontSize: 13)),
+                            if (s.frac != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: LinearProgressIndicator(
+                                      value: s.frac, minHeight: 4, color: kBlue, backgroundColor: Colors.white.withAlpha(38)),
+                                ),
+                              ),
+                          ]),
+                        ),
+                        const Icon(Icons.chevron_right_rounded, color: Color(0x8CF5F5F7)),
+                      ]),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -376,37 +399,30 @@ class _SeerrSettingsScreenState extends State<SeerrSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    InputDecoration deco(String l, [String? h]) => InputDecoration(
-          labelText: l,
-          hintText: h,
-          filled: true,
-          fillColor: Colors.white.withAlpha(20),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        );
     return Scaffold(
-      appBar: AppBar(title: const Text('Seerr bağlantısı')),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        const Text(
-            'Seerr\'de Ayarlar → Genel sayfasındaki "API Anahtarı"nı kopyalayıp buraya yapıştır. '
-            'Anahtar sadece bu telefonda saklanır.',
-            style: TextStyle(color: kMuted, height: 1.4)),
-        const SizedBox(height: 18),
-        TextField(controller: u, decoration: deco('Seerr adresi', 'http://sunucu:5055'), keyboardType: TextInputType.url, autocorrect: false),
-        const SizedBox(height: 12),
-        TextField(controller: k, decoration: deco('API anahtarı'), autocorrect: false, obscureText: true),
-        const SizedBox(height: 18),
-        FilledButton(
-          onPressed: busy ? null : save,
-          style: FilledButton.styleFrom(backgroundColor: kBlue, padding: const EdgeInsets.symmetric(vertical: 14)),
-          child: busy
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Kaydet ve dene', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+      backgroundColor: kBg,
+      body: CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
+        iosNav('Seerr', back: 'Profil'),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(hPad(context), 4, hPad(context), 40),
+          sliver: SliverList.list(children: [
+            const Text(
+                'Seerr\'de Ayarlar → Genel sayfasındaki "API Anahtarı"nı kopyalayıp buraya yapıştır. '
+                'Anahtar sadece bu telefonda saklanır.',
+                style: TextStyle(color: Color(0x8CF5F5F7), height: 1.4)),
+            const SizedBox(height: 18),
+            IosField(u, 'Seerr adresi (http://sunucu:5055)', keyboardType: TextInputType.url),
+            const SizedBox(height: 10),
+            IosField(k, 'API anahtarı', obscure: true, onSubmitted: (_) => save()),
+            const SizedBox(height: 18),
+            PillButton('Kaydet ve dene', height: 52, expand: true, busy: busy, onTap: save),
+            if (msg.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: Text(msg, style: TextStyle(color: ok ? const Color(0xFF34C759) : const Color(0xFFFF8A8A))),
+              ),
+          ]),
         ),
-        if (msg.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: Text(msg, style: TextStyle(color: ok ? const Color(0xFF4ADE80) : const Color(0xFFFF8A8A))),
-          ),
       ]),
     );
   }

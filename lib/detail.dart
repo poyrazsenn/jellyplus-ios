@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
@@ -118,9 +119,20 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (err.isNotEmpty) return Scaffold(appBar: AppBar(), body: ErrorView(err, retry: load));
+    Widget bare(Widget body) => Scaffold(
+          backgroundColor: kBg,
+          body: Stack(children: [
+            Positioned.fill(child: body),
+            Positioned(
+              left: 14,
+              top: MediaQuery.paddingOf(context).top + 8,
+              child: GlassIcon(Icons.arrow_back_ios_new_rounded, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
+            ),
+          ]),
+        );
+    if (err.isNotEmpty) return bare(ErrorView(err, retry: load));
     final x = it;
-    if (x == null) return Scaffold(appBar: AppBar(backgroundColor: Colors.transparent), body: const Loading());
+    if (x == null) return bare(const Loading());
     final w = MediaQuery.sizeOf(context).width;
     final pad = hPad(context);
     final p = pit ?? x;
@@ -157,9 +169,8 @@ class _DetailScreenState extends State<DetailScreen> {
       else
         rt(x['RunTimeTicks']),
       if (x['CommunityRating'] != null) '★ ${(x['CommunityRating'] as num).toStringAsFixed(1)}',
-    ].where((s) => s.isNotEmpty).join(' • ');
+    ].where((s) => s.isNotEmpty).join(' · ');
     final genres = ((x['Genres'] as List?) ?? const []).take(4).join(', ');
-    final ds = descs(x);
     final seasons = eps.map((e) => e['ParentIndexNumber'] as num?).toSet().toList();
     final tabs = [
       if (eps.isNotEmpty) ['eps', 'Bölümler'],
@@ -169,12 +180,13 @@ class _DetailScreenState extends State<DetailScreen> {
     ];
     final fav = x['UserData']?['IsFavorite'] == true;
     final seen = x['UserData']?['Played'] == true;
-    final heroH = w > 700 ? w * .5 : w * .78;
+    final heroH = w > 700 ? w * .5 : w * 1.02;
 
     String playLabel() {
-      if (!res) return isSeries && p['IndexNumber'] != null ? 'OYNAT  S${p['ParentIndexNumber']}:B${p['IndexNumber']}' : 'OYNAT';
+      if (!res) return isSeries && p['IndexNumber'] != null ? 'Oynat · S${p['ParentIndexNumber']} B${p['IndexNumber']}' : 'Oynat';
       final left = ((p['RunTimeTicks'] as num?) ?? 0) - resTicks;
-      return 'DEVAM ET${left > 0 ? '  •  ${rt(left)} kaldı' : ''}';
+      final ep = isSeries && p['IndexNumber'] != null ? ' · S${p['ParentIndexNumber']} B${p['IndexNumber']}' : '';
+      return 'Devam et$ep${left > 0 ? ' · ${rt(left)} kaldı' : ''}';
     }
 
     return Scaffold(
@@ -189,35 +201,25 @@ class _DetailScreenState extends State<DetailScreen> {
                   gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0x66040714), Color(0x00040714), Color(0xCC040714), kBg],
+                      colors: [Color(0x660B0B0D), Color(0x000B0B0D), Color(0xCC0B0B0D), kBg],
                       stops: [0, .3, .78, 1]),
                 ),
               ),
               Positioned(
-                top: MediaQuery.paddingOf(context).top + 6,
-                left: 10,
-                child: CircleAvatar(
-                  backgroundColor: Colors.black54,
-                  child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.of(context).maybePop()),
-                ),
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: 14,
+                child: GlassIcon(Icons.arrow_back_ios_new_rounded,
+                    tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
               ),
               if (hasTheme)
                 Positioned(
-                  top: MediaQuery.paddingOf(context).top + 6,
-                  right: 10,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.black54,
-                    child: IconButton(
-                      tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç',
-                      icon: Icon(api.themeOn ? Icons.volume_up : Icons.volume_off, color: Colors.white),
-                      onPressed: () {
-                        setState(() => api.themeOn = !api.themeOn);
-                        api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
-                      },
-                    ),
-                  ),
+                  top: MediaQuery.paddingOf(context).top + 8,
+                  right: 14,
+                  child: GlassIcon(api.themeOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                      tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç', onTap: () {
+                    setState(() => api.themeOn = !api.themeOn);
+                    api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
+                  }),
                 ),
               Positioned(
                 left: pad,
@@ -238,34 +240,21 @@ class _DetailScreenState extends State<DetailScreen> {
         SliverPadding(
           padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
           sliver: SliverList.list(children: [
-            Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              AgeBadge(x['OfficialRating'], size: 26),
-              for (final k in ds) DescIcon(k, size: 26),
-              for (final c in chips)
+            Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Text(meta, style: const TextStyle(color: Color(0xB8F5F5F7), fontSize: 13)),
+              for (final c in [if (ageLabel(x['OfficialRating']) != null) ageLabel(x['OfficialRating'])!, ...chips])
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.white.withAlpha(46), borderRadius: BorderRadius.circular(4)),
-                  child: Text(c, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0x80F5F5F7), width: 1), borderRadius: BorderRadius.circular(4)),
+                  child: Text(c, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xB8F5F5F7))),
                 ),
-              Text(meta, style: const TextStyle(color: Color(0xFFDFE4F5), fontSize: 13)),
             ]),
             if (genres.isNotEmpty)
               Padding(padding: const EdgeInsets.only(top: 6), child: Text(genres, style: const TextStyle(fontSize: 13))),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 50,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFF9F9F9),
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                onPressed: () async {
-                  await openPlayer(context, p);
-                },
-                icon: const Icon(Icons.play_arrow, size: 28),
-                label: Text(playLabel(), style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.4)),
-              ),
-            ),
+            PillButton(playLabel(),
+                icon: Icons.play_arrow_rounded, height: 52, expand: true, onTap: () => openPlayer(context, p)),
             if (res && ((p['RunTimeTicks'] as num?) ?? 0) > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -275,12 +264,12 @@ class _DetailScreenState extends State<DetailScreen> {
                     value: (resTicks / (p['RunTimeTicks'] as num)).clamp(0, 1).toDouble(),
                     minHeight: 3,
                     backgroundColor: Colors.white24,
-                    color: const Color(0xFF4DA6FF),
+                    color: Colors.white,
                   ),
                 ),
               ),
             const SizedBox(height: 12),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+            Row(children: [
               _act(fav ? Icons.check : Icons.add, 'Listem', () => flag('fav', !fav)),
               if (tr != null)
                 _act(Icons.movie_creation_outlined, 'Fragman',
@@ -302,31 +291,36 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
               ),
             const SizedBox(height: 14),
-            // sekmeler
+            // sekmeler: iOS bölümlü seçici
             Container(
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white24, width: 1.5))),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: [
-                  for (final t in tabs)
-                    GestureDetector(
-                      onTap: () => setState(() => tab = t[0]),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 26),
-                        padding: const EdgeInsets.fromLTRB(0, 14, 0, 9),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                for (final t in tabs)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => tab = t[0]);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        height: 34,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
-                            border: Border(
-                                bottom: BorderSide(color: tab == t[0] ? Colors.white : Colors.transparent, width: 3))),
-                        child: Text(t[1].toUpperCase(),
+                          color: tab == t[0] ? Colors.white.withAlpha(46) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(t[1],
+                            maxLines: 1,
                             style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 1.5,
-                                color: tab == t[0] ? Colors.white : Colors.white60)),
+                                fontWeight: tab == t[0] ? FontWeight.w600 : FontWeight.w500,
+                                color: tab == t[0] ? Colors.white : const Color(0xA6F5F5F7))),
                       ),
                     ),
-                ]),
-              ),
+                  ),
+              ]),
             ),
             const SizedBox(height: 14),
           ]),
@@ -350,31 +344,43 @@ class _DetailScreenState extends State<DetailScreen> {
     return _act(b.icon, b.label, () => d == null ? askDownload(context, [v]) : dlActions(context, d), frac: b.frac);
   }
 
-  Widget _act(IconData i, String label, VoidCallback onTap, {double? frac}) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+  /// A · Cam: cam kare eylem kutusu (Listem, İndir, Fragman…)
+  Widget _act(IconData i, String label, VoidCallback onTap, {double? frac}) => Expanded(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            SizedBox(
-              width: 42,
-              height: 42,
-              child: Stack(alignment: Alignment.center, children: [
-                Container(
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black54,
-                      border: Border.all(color: frac != null ? Colors.white24 : Colors.white, width: 2)),
-                  child: Center(child: Icon(i, size: 22)),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Semantics(
+            button: true,
+            label: label,
+            child: Pressable(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onTap();
+              },
+              child: Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(20),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withAlpha(26)),
                 ),
-                if (frac != null)
-                  SizedBox.expand(
-                      child: CircularProgressIndicator(value: frac == 0 ? null : frac, strokeWidth: 2.5, color: kBlue)),
-              ]),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Stack(alignment: Alignment.center, children: [
+                      Icon(i, size: frac != null ? 14 : 21),
+                      if (frac != null)
+                        SizedBox.expand(
+                            child: CircularProgressIndicator(
+                                value: frac == 0 ? null : frac, strokeWidth: 2, color: Colors.white)),
+                    ]),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                ]),
+              ),
             ),
-            const SizedBox(height: 5),
-            Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFFCFD5EA))),
-          ]),
+          ),
         ),
       );
 
@@ -403,18 +409,34 @@ class _DetailScreenState extends State<DetailScreen> {
           if (seasons.length > 1)
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 44,
+                height: 48,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: pad),
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(pad, 6, pad, 6),
                   children: [
                     for (final s in seasons)
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(s == null || s == 0 ? 'Özel' : '$s. Sezon'),
-                          selected: s == season,
-                          onSelected: (_) => setState(() => season = s),
+                        child: Pressable(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => season = s);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: s == season ? kBlue : const Color(0x1FFFFFFF),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Text(s == null || s == 0 ? 'Özel' : 'Sezon $s',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: s == season ? kInk : const Color(0xFFF5F5F7))),
+                          ),
                         ),
                       ),
                   ],
@@ -426,10 +448,8 @@ class _DetailScreenState extends State<DetailScreen> {
               padding: EdgeInsets.fromLTRB(pad, 6, pad, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  icon: const Icon(Icons.download_outlined, size: 20),
-                  label: Text(season == null || season == 0 ? 'Özel bölümleri indir' : '$season. sezonu indir'),
-                  onPressed: () {
+                child: Pressable(
+                  onTap: () {
                     final todo = list.where((e) => Downloads.I.of('${e['Id']}') == null).toList();
                     if (todo.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -438,6 +458,17 @@ class _DetailScreenState extends State<DetailScreen> {
                     }
                     askDownload(context, todo, title: '${todo.length} bölümü indir');
                   },
+                  child: Container(
+                    height: 34,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(color: const Color(0x1FFFFFFF), borderRadius: BorderRadius.circular(17)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFFF5F5F7)),
+                      const SizedBox(width: 6),
+                      Text(season == null || season == 0 ? 'Özel bölümleri indir' : 'Sezon $season\'i indir',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
                 ),
               ),
             ),
@@ -468,7 +499,7 @@ class _DetailScreenState extends State<DetailScreen> {
     final img = ((e['ImageTags'] as Map?)?['Primary']) != null
         ? api.image(e['Id'], 'Primary', tag: e['ImageTags']['Primary'], w: 400)
         : backdrop(e, w: 400);
-    return InkWell(
+    return Pressable(
       onTap: () => openPlayer(c, e),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
@@ -476,16 +507,20 @@ class _DetailScreenState extends State<DetailScreen> {
           child: AspectRatio(
             aspectRatio: 16 / 9,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(12),
               child: Stack(fit: StackFit.expand, children: [
                 Container(color: kCard),
                 netImg(img),
-                const Center(child: Icon(Icons.play_circle_outline, size: 34, color: Colors.white70)),
                 if (pr > 0 && pr < 100)
-                  Align(
-                    alignment: Alignment.bottomLeft,
-                    child: FractionallySizedBox(
-                        widthFactor: pr / 100, child: Container(height: 3, color: const Color(0xFF4DA6FF))),
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                    height: 4,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(value: pr / 100, color: kBlue, backgroundColor: const Color(0x40FFFFFF)),
+                    ),
                   ),
               ]),
             ),
@@ -497,11 +532,11 @@ class _DetailScreenState extends State<DetailScreen> {
             Text('${e['IndexNumber'] ?? ''}. ${e['Name'] ?? ''}',
                 maxLines: 2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             const SizedBox(height: 3),
-            Text([rt(e['RunTimeTicks']), if (ud['Played'] == true) 'İzlendi ✓'].where((s) => s.isNotEmpty).join(' • '),
+            Text([rt(e['RunTimeTicks']), if (ud['Played'] == true) 'İzlendi ✓'].where((s) => s.isNotEmpty).join(' · '),
                 style: const TextStyle(color: kMuted, fontSize: 12)),
             const SizedBox(height: 4),
             Text('${e['Overview'] ?? ''}',
-                maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFCFD5EA), height: 1.4)),
+                maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0x99F5F5F7), height: 1.4)),
           ]),
         ),
         _epDl(c, e),
@@ -521,13 +556,24 @@ class _DetailScreenState extends State<DetailScreen> {
               width: 26,
               height: 26,
               child: CircularProgressIndicator(value: b.frac == 0 ? null : b.frac, strokeWidth: 2, color: kBlue)),
-        IconButton(
-          padding: EdgeInsets.zero,
-          iconSize: b.frac != null ? 14 : 22,
-          tooltip: b.label,
-          icon: Icon(b.frac != null ? Icons.stop_rounded : b.icon,
-              color: d?.state == DlState.done ? kBlue : Colors.white70),
-          onPressed: () => d == null ? askDownload(c, [e]) : dlActions(c, d),
+        Semantics(
+          button: true,
+          label: b.label,
+          child: Pressable(
+            onTap: () => d == null ? askDownload(c, [e]) : dlActions(c, d),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Icon(
+                  b.frac != null
+                      ? Icons.stop_rounded
+                      : d?.state == DlState.done
+                          ? Icons.check_circle_rounded
+                          : Icons.arrow_circle_down_rounded,
+                  size: b.frac != null ? 14 : 24,
+                  color: d?.state == DlState.done ? kBlue : const Color(0xB3F5F5F7)),
+            ),
+          ),
         ),
       ]),
     );
@@ -560,8 +606,7 @@ class _DetailScreenState extends State<DetailScreen> {
             itemBuilder: (c, i) {
               final p = cast[i];
               final tag = p['PrimaryImageTag'];
-              return InkWell(
-                borderRadius: BorderRadius.circular(8),
+              return Pressable(
                 onTap: () => Navigator.of(c).push(
                     MaterialPageRoute(builder: (_) => PersonScreen(id: '${p['Id']}', name: '${p['Name']}'))),
                 child: SizedBox(

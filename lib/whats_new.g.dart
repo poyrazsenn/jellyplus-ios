@@ -3,5 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['download', 'Çevrimdışı geçiş', 'İnternet kesildiği an uygulama İndirilenler sekmesine geçer ve alt tarafta "Çevrimdışısın" şeridi görünür. Bağlantı gelince haber verir, izlediğin yeri Jellyfin\'e yazar ve tek dokunuşla Ana sayfaya döndürür.'],
+  ['request', 'Android parçaları temizlendi', 'Giriş, profil seçimi, oyuncu sayfası, İsteklerim, Seerr bağlantısı ve altyazı arama iOS düzenine geçti. Büyük başlıklar, cam metin kutuları, beyaz kapsül düğmeler.'],
+  ['update', 'iOS uyarıları', 'Güncelleme uyarısı iPhone\'un kendi uyarı penceresi; bildirimler alttan çıkan yuvarlak kapsül.'],
 ];
