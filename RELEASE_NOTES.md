@@ -1,6 +1,11 @@
-## Poyraz Player 3.0 — beta 5
+## Poyraz Player 3.0 — beta 6
 
 **Yenilikler**
+
+- **Yeni ses ve altyazı menüsü:** Oynatıcıda alttan açılan sayfa kalktı. Üstteki düğmenin altında iki sütunlu cam menü açılıyor: solda ses, hız ve gece modu; sağda altyazı, zamanlama ve altyazı arama.
+- **Gece modu:** Yüksek sesleri kısıp fısıltıları duyulur yapar; gece kulaklıksız izlerken işe yarar.
+
+**Beta 5'te gelenler**
 
 - **Disney+ izleri temizlendi:** Yuvarlak yaş ve içerik simgeleri kalktı. Detayda yaş sınırı Apple TV gibi ince çerçeveli "13+" etiketi; oynatıcıda açılışta küçük cam bilgi kartı.
 - **Yeni sezon düğmeleri:** Dizilerde "Sezon 1, Sezon 2" cam kapsüller; seçili sezon beyaz. Bölüm kartları yuvarlak köşeli, ilerleme çubuğu içeride.

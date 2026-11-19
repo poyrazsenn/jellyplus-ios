@@ -192,6 +192,7 @@ const _icons = {
   'library': Icons.video_library_outlined,
   'update': Icons.new_releases_outlined,
   'audio': Icons.graphic_eq,
+  'night': Icons.nightlight_outlined,
   'speed': Icons.speed,
 };
 

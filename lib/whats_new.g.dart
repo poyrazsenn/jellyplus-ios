@@ -3,6 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['star', 'Disney+ izleri temizlendi', 'Yuvarlak yaş ve içerik simgeleri kalktı. Detayda yaş sınırı Apple TV gibi ince çerçeveli "13+" etiketi; oynatıcıda açılışta küçük cam bilgi kartı.'],
-  ['next', 'Yeni sezon düğmeleri', 'Dizilerde "Sezon 1, Sezon 2" cam kapsüller; seçili sezon beyaz. Bölüm kartları yuvarlak köşeli, ilerleme çubuğu içeride.'],
+  ['subtitles', 'Yeni ses ve altyazı menüsü', 'Oynatıcıda alttan açılan sayfa kalktı. Üstteki düğmenin altında iki sütunlu cam menü açılıyor: solda ses, hız ve gece modu; sağda altyazı, zamanlama ve altyazı arama.'],
+  ['audio', 'Gece modu', 'Yüksek sesleri kısıp fısıltıları duyulur yapar; gece kulaklıksız izlerken işe yarar.'],
 ];
