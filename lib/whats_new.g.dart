@@ -3,6 +3,7 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['request', 'Android parçaları temizlendi', 'Giriş, profil seçimi, oyuncu sayfası, İsteklerim, Seerr bağlantısı ve altyazı arama iOS düzenine geçti. Büyük başlıklar, cam metin kutuları, beyaz kapsül düğmeler.'],
-  ['update', 'iOS uyarıları', 'Güncelleme uyarısı iPhone\'un kendi uyarı penceresi; bildirimler alttan çıkan yuvarlak kapsül.'],
+  ['top', 'Bugün Top 10', 'Ana sayfada, dünyada bugün en popüler yapımlardan arşivinde olan ilk 10. Liste Seerr üzerinden gelir, Seerr bağlıyken görünür.'],
+  ['calendar', 'Yakında', 'Takip ettiğin dizilerin çıkacak bölümleri. Ana sayfadaki sıraya dokununca günlere göre ayrılmış takvim açılır.'],
+  ['order', 'Seri sırası', 'Bir koleksiyondaki filmin sayfasında, serinin bütün filmleri çıkış sırasıyla. İzlediklerin işaretli, açtığın film vurgulu.'],
 ];

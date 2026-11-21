@@ -15,6 +15,10 @@ notes = (root / 'RELEASE_NOTES.md').read_text(encoding='utf-8').splitlines()
 
 # anahtar kelime → Material simgesi (ilk eşleşen kazanır)
 ICONS = [
+    (r'top 10|popüler', 'top'),
+    (r'yakında|takvim', 'calendar'),
+    (r'seri sırası', 'order'),
+    (r'gece modu', 'night'),
     (r'indir|çevrimdışı|offline', 'download'),
     (r'seerr|iste[kğ]', 'request'),
     (r'önizleme|trickplay|fragman', 'preview'),
