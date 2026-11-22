@@ -1,5 +1,9 @@
-## Poyraz Player 3.0 — beta 13
+## Poyraz Player 3.0 — beta 14
 **Yenilikler**
+
+- **Yakında: doğru yayın günleri:** Yeni bölüm tarihleri artık TVmaze'den geliyor; dijital platformda çıkan diziler (ör. Paramount+'ta Cuma) doğru günde görünüyor. Bölüm adları ve görselleri yine Seerr'den Türkçe.
+
+**Beta 13'te gelenler**
 
 - **Yakında düzeltmesi:** Sunucunda zaten olan bölümler artık "yakında" görünmüyor; yerine sezon takvimindeki gerçekten sıradaki bölüm geliyor.
 

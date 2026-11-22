@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import 'api.dart';
 import 'nav.dart';
@@ -72,73 +75,134 @@ class Discover {
 
   final Map<String, (DateTime, J?)> _next = {}; // dizi id → (ne zaman alındı, sıradaki bölüm)
 
-  /// Bir dizinin sıradaki bölümü, Seerr (TMDB) bilgisiyle. Yoksa null.
+  final Map<String, int?> _maze = {}; // dizi id → TVmaze id
+
+  Future<dynamic> _mazeGet(String path) async {
+    final r = await http.get(Uri.parse('https://api.tvmaze.com$path')).timeout(const Duration(seconds: 15));
+    if (r.statusCode != 200) return null;
+    return jsonDecode(utf8.decode(r.bodyBytes));
+  }
+
+  /// TVmaze: yayın günleri platforma göre doğru (ör. Paramount+ Cuma); anahtar gerekmez.
+  Future<List<J>?> _mazeEpisodes(J series) async {
+    final sid = '${series['Id']}';
+    final pid = (series['ProviderIds'] as Map?) ?? const {};
+    if (!_maze.containsKey(sid)) {
+      int? id;
+      for (final q in [
+        if (pid['Imdb'] != null) 'imdb=${pid['Imdb']}',
+        if (pid['Tvdb'] != null) 'thetvdb=${pid['Tvdb']}',
+      ]) {
+        final r = await _mazeGet('/lookup/shows?$q');
+        if (r is Map && r['id'] != null) {
+          id = (r['id'] as num).toInt();
+          break;
+        }
+      }
+      _maze[sid] = id;
+    }
+    final id = _maze[sid];
+    if (id == null) return null;
+    final l = await _mazeGet('/shows/$id/episodes');
+    return l is List ? l.map((e) => J.from(e as Map)).toList() : null;
+  }
+
+  /// Bir dizinin sıradaki bölümü. Tarih TVmaze'den (yoksa Seerr/TMDB'den),
+  /// Türkçe ad ve görsel Seerr'den. Sunucunda zaten olan bölümler atlanır.
   Future<J?> nextEpisode(J series) async {
     final sid = '${series['Id']}';
     final c = _next[sid];
     if (c != null && DateTime.now().difference(c.$1).inHours < 6) return c.$2;
     final tmdb = (series['ProviderIds'] as Map?)?['Tmdb'];
-    if (!Seerr.I.on || tmdb == null || '$tmdb'.isEmpty) return null;
-    J? out;
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day);
+
+    final have = <String>{};
     try {
-      final d = await Seerr.I.tv('$tmdb');
-      final n = d?['nextEpisodeToAir'] as Map?;
-      if (n != null) {
-        // Sunucunda zaten olan bölümler "yakında" sayılmaz: sezon takviminden ilk eksik bölümü bul.
-        final have = <String>{};
-        try {
-          final l = await api.items('/Shows/$sid/Episodes?UserId=${api.uid}&IsMissing=false&Fields=');
-          for (final e in l) {
-            if (e['LocationType'] == 'Virtual') continue;
-            have.add('${e['ParentIndexNumber']}x${e['IndexNumber']}');
-          }
-        } catch (_) {}
-        final today = DateTime.now();
-        final start = DateTime(today.year, today.month, today.day);
-        J? pick;
-        final sn = (n['seasonNumber'] as num?)?.toInt() ?? 0;
-        if (!have.contains('${n['seasonNumber']}x${n['episodeNumber']}')) {
-          pick = J.from(n);
-        } else {
-          try {
-            for (final e in await Seerr.I.season('$tmdb', sn)) {
-              final when = DateTime.tryParse('${e['airDate'] ?? ''}');
-              if (when == null || when.isBefore(start)) continue;
-              if (have.contains('${e['seasonNumber'] ?? sn}x${e['episodeNumber']}')) continue;
-              pick = e;
-              break;
-            }
-          } catch (_) {}
-        }
-        final when = DateTime.tryParse('${pick?['airDate'] ?? ''}');
-        if (pick != null && when != null) {
-          final still = '${pick['stillPath'] ?? ''}';
-          out = <String, dynamic>{
-            'Type': 'Episode',
-            'Id': sid,
-            'SeriesId': sid,
-            'SeriesName': series['Name'],
-            'Name': pick['name'],
-            'ParentIndexNumber': pick['seasonNumber'] ?? sn,
-            'IndexNumber': pick['episodeNumber'],
-            'PremiereDate': '${pick['airDate']}',
-            'ImageTags': {if ((series['ImageTags'] as Map?)?['Thumb'] != null) 'Thumb': series['ImageTags']['Thumb']},
-            'BackdropImageTags': series['BackdropImageTags'] ?? const [],
-            'SeriesPrimaryImageTag': (series['ImageTags'] as Map?)?['Primary'],
-            if (still.isNotEmpty) '_img': 'https://image.tmdb.org/t/p/w780$still',
-            '_seerr': true,
-          };
+      final l = await api.items('/Shows/$sid/Episodes?UserId=${api.uid}&IsMissing=false&Fields=');
+      for (final e in l) {
+        if (e['LocationType'] == 'Virtual') continue;
+        have.add('${e['ParentIndexNumber']}x${e['IndexNumber']}');
+      }
+    } catch (_) {}
+
+    int? sn, en;
+    String? when, name, still;
+    var ok = false;
+    // 1) TVmaze
+    try {
+      final eps = await _mazeEpisodes(series);
+      if (eps != null) {
+        ok = true;
+        for (final e in eps) {
+          final at = DateTime.tryParse('${e['airstamp'] ?? ''}')?.toLocal();
+          if (at == null || at.isBefore(start)) continue;
+          if (e['number'] == null || have.contains('${e['season']}x${e['number']}')) continue;
+          sn = (e['season'] as num?)?.toInt();
+          en = (e['number'] as num?)?.toInt();
+          when = at.toIso8601String();
+          name = '${e['name'] ?? ''}';
+          final im = e['image'] as Map?;
+          if (im?['original'] != null) still = '${im!['original']}';
+          break;
         }
       }
-    } catch (_) {
-      return null; // ağ hatası: önbelleğe yazma, sonra tekrar dene
+    } catch (_) {}
+    // 2) Seerr: TVmaze bulamadıysa tarih, bulduysa Türkçe ad ve görsel
+    if (Seerr.I.on && tmdb != null && '$tmdb'.isNotEmpty) {
+      try {
+        if (!ok) {
+          final d = await Seerr.I.tv('$tmdb');
+          final n = d?['nextEpisodeToAir'] as Map?;
+          if (n != null) {
+            ok = true;
+            final s0 = (n['seasonNumber'] as num?)?.toInt() ?? 0;
+            for (final e in [J.from(n), ...await Seerr.I.season('$tmdb', s0).catchError((_) => <J>[])]) {
+              final at = DateTime.tryParse('${e['airDate'] ?? ''}');
+              if (at == null || at.isBefore(start)) continue;
+              if (have.contains('${e['seasonNumber'] ?? s0}x${e['episodeNumber']}')) continue;
+              sn = (e['seasonNumber'] as num?)?.toInt() ?? s0;
+              en = (e['episodeNumber'] as num?)?.toInt();
+              when = '${e['airDate']}';
+              name = '${e['name'] ?? ''}';
+              if ('${e['stillPath'] ?? ''}'.isNotEmpty) still = 'https://image.tmdb.org/t/p/w780${e['stillPath']}';
+              break;
+            }
+          }
+        } else if (sn != null && en != null) {
+          for (final e in await Seerr.I.season('$tmdb', sn)) {
+            if ((e['episodeNumber'] as num?)?.toInt() != en) continue;
+            if ('${e['name'] ?? ''}'.isNotEmpty) name = '${e['name']}';
+            if ('${e['stillPath'] ?? ''}'.isNotEmpty) still = 'https://image.tmdb.org/t/p/w780${e['stillPath']}';
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+    if (!ok) return null; // ikisine de ulaşılamadı: önbelleğe yazma, sonra yeniden dene
+    J? out;
+    if (when != null && en != null) {
+      out = <String, dynamic>{
+        'Type': 'Episode',
+        'Id': sid,
+        'SeriesId': sid,
+        'SeriesName': series['Name'],
+        'Name': name,
+        'ParentIndexNumber': sn,
+        'IndexNumber': en,
+        'PremiereDate': when,
+        'ImageTags': {if ((series['ImageTags'] as Map?)?['Thumb'] != null) 'Thumb': series['ImageTags']['Thumb']},
+        'BackdropImageTags': series['BackdropImageTags'] ?? const [],
+        'SeriesPrimaryImageTag': (series['ImageTags'] as Map?)?['Primary'],
+        if (still != null) '_img': still,
+      };
     }
     _next[sid] = (DateTime.now(), out);
     return out;
   }
 
   /// Kütüphanendeki devam eden dizilerin çıkacak bölümleri.
-  /// Tarihler Seerr'den (TMDB) gelir; Jellyfin'in bildiği gelecek bölümler de eklenir.
+  /// Tarihler TVmaze'den (yoksa Seerr/TMDB'den) gelir; Jellyfin'in bildiği gelecek bölümler de eklenir.
   Future<List<J>> upcoming() async {
     final u = api.uid;
     final today = DateTime.now();
@@ -148,12 +212,10 @@ class Discover {
           .items('/Shows/Upcoming?UserId=$u&Limit=80&Fields=$kFields,PremiereDate,LocationType'
               '&EnableImageTypes=Primary,Backdrop,Thumb&ImageTypeLimit=1')
           .catchError((_) => <J>[]),
-      Seerr.I.on
-          ? api
-              .items('/Users/$u/Items?IncludeItemTypes=Series&Recursive=true&SeriesStatus=Continuing'
-                  '&Fields=ProviderIds,$kFields&EnableImageTypes=Primary,Backdrop,Thumb&ImageTypeLimit=1')
-              .catchError((_) => <J>[])
-          : Future.value(<J>[]),
+      api
+          .items('/Users/$u/Items?IncludeItemTypes=Series&Recursive=true&SeriesStatus=Continuing'
+              '&Fields=ProviderIds,$kFields&EnableImageTypes=Primary,Backdrop,Thumb&ImageTypeLimit=1')
+          .catchError((_) => <J>[]),
     ]);
     final fromSeerr = <J>[];
     final shows = r[1];
