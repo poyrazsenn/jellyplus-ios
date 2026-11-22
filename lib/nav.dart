@@ -32,8 +32,21 @@ Future<void> openPlayer(BuildContext c, J it, {bool restart = false}) async {
     return;
   }
   ThemeMusic.I.stop(hard: true);
-  await Navigator.of(c, rootNavigator: true).push(MaterialPageRoute(
-      fullscreenDialog: true, builder: (_) => PlayerScreen(item: it, restart: restart)));
+  // Apple TV gibi: oynatıcı yumuşakça büyüyerek açılır, kapanırken küçülerek kaybolur
+  await Navigator.of(c, rootNavigator: true).push(PageRouteBuilder(
+    opaque: true,
+    fullscreenDialog: true,
+    transitionDuration: const Duration(milliseconds: 380),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (_, __, ___) => PlayerScreen(item: it, restart: restart),
+    transitionsBuilder: (_, a, __, child) {
+      final t = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+      return FadeTransition(
+        opacity: t,
+        child: ScaleTransition(scale: Tween(begin: .94, end: 1.0).animate(t), child: child),
+      );
+    },
+  ));
   refreshBus.value++;
 }
 

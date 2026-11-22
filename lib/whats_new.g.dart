@@ -3,7 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['top', 'Bugün Top 10', 'Ana sayfada, dünyada bugün en popüler yapımlardan arşivinde olan ilk 10. Liste Seerr üzerinden gelir, Seerr bağlıyken görünür.'],
-  ['calendar', 'Yakında', 'Takip ettiğin dizilerin çıkacak bölümleri. Ana sayfadaki sıraya dokununca günlere göre ayrılmış takvim açılır.'],
-  ['order', 'Seri sırası', 'Bir koleksiyondaki filmin sayfasında, serinin bütün filmleri çıkış sırasıyla. İzlediklerin işaretli, açtığın film vurgulu.'],
+  ['next', 'Oynatıcıda yeni simgeler', 'Görüntü, ses ve altyazı ve bölümler düğmeleri tasarımdaki ince çizgili simgelere geçti.'],
+  ['next', 'iOS animasyonları', 'Oynatıcı büyüyerek açılıp küçülerek kapanıyor. Görüntü ve ses/altyazı menüleri sağ üstten açılıp kapanıyor, bölümler şeridi kayarak geliyor.'],
 ];

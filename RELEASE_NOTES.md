@@ -1,10 +1,15 @@
-## Poyraz Player 3.0 — beta 9
-
+## Poyraz Player 3.0 — beta 10
 **Yenilikler**
+
+- **Oynatıcıda yeni simgeler:** Görüntü, ses ve altyazı ve bölümler düğmeleri tasarımdaki ince çizgili simgelere geçti.
+- **iOS animasyonları:** Oynatıcı büyüyerek açılıp küçülerek kapanıyor. Görüntü ve ses/altyazı menüleri sağ üstten açılıp kapanıyor, bölümler şeridi kayarak geliyor.
+
+**Beta 9'da gelenler**
 
 - **Bugün Top 10:** Ana sayfada, dünyada bugün en popüler yapımlardan arşivinde olan ilk 10. Liste Seerr üzerinden gelir, Seerr bağlıyken görünür.
 - **Yakında:** Takip ettiğin dizilerin çıkacak bölümleri. Ana sayfadaki sıraya dokununca günlere göre ayrılmış takvim açılır.
 - **Seri sırası:** Bir koleksiyondaki filmin sayfasında, serinin bütün filmleri çıkış sırasıyla. İzlediklerin işaretli, açtığın film vurgulu.
+
 
 **Beta 8'de gelenler**
 
@@ -53,6 +58,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** iPad düzeni (beta 10), uzun basınca önizleme menüsü ve ortak ayarlar (beta 11), web istemcisinin yeni görünümü.
+**Sonraki betalarda:** iPad düzeni (beta 11), uzun basınca önizleme menüsü ve ortak ayarlar (beta 12), web istemcisinin yeni görünümü.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.

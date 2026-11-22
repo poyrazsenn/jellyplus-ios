@@ -1155,9 +1155,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
                             if (epsOpen)
                               _capBtn(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, playing ? 'Duraklat' : 'Oynat', _togglePlay),
-                            _capBtn(Icons.wb_sunny_outlined, 'Görüntü', _openView, on: viewOpen),
-                            _capBtn(Icons.subtitles_outlined, 'Ses ve altyazı', _toggleTracks, on: tracksOpen),
-                            if (eps.length > 1) _capBtn(Icons.video_library_outlined, 'Bölümler', _toggleEps, on: epsOpen),
+                            _capBtn('sun', 'Görüntü', _openView, on: viewOpen),
+                            _capBtn('cc', 'Ses ve altyazı', _toggleTracks, on: tracksOpen),
+                            if (eps.length > 1) _capBtn('eps', 'Bölümler', _toggleEps, on: epsOpen),
                           ]),
                         ),
                       ]),
@@ -1191,7 +1191,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               ),
                       ),
                       _scrubber(maxV, curV),
-                      if (epsOpen) _epsStrip(),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 280),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (c, a) => SizeTransition(
+                          sizeFactor: a,
+                          axisAlignment: -1,
+                          child: FadeTransition(opacity: a, child: c),
+                        ),
+                        child: epsOpen ? KeyedSubtree(key: const ValueKey('eps'), child: _epsStrip()) : const SizedBox(width: double.infinity),
+                      ),
                     ]),
                   ),
                 ),
@@ -1233,8 +1243,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ),
             ),
           ),
-          if (viewOpen) _viewPanel(),
-          if (tracksOpen && ui) _tracksPanel(),
+          _pop(viewOpen, _viewPanel()),
+          _pop(tracksOpen && ui, _tracksPanel()),
           // giriş atla / sonraki bölüm
           Positioned(
             right: 40,
@@ -1293,7 +1303,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       );
 
   // =================== 3.0 oynatıcı parçaları ===================
-  Widget _capBtn(IconData i, String label, VoidCallback f, {bool on = false}) => Semantics(
+  Widget _capBtn(Object i, String label, VoidCallback f, {bool on = false}) => Semantics(
         button: true,
         label: label,
         child: Pressable(
@@ -1305,10 +1315,39 @@ class _PlayerScreenState extends State<PlayerScreen> {
             width: 38,
             height: 38,
             decoration: BoxDecoration(color: on ? kBlue : Colors.transparent, borderRadius: BorderRadius.circular(19)),
-            child: Icon(i, size: 20, color: on ? kInk : Colors.white),
+            child: i is IconData
+                ? Icon(i, size: 20, color: on ? kInk : Colors.white)
+                : CustomPaint(painter: _CapIcon(i as String, on ? kInk : Colors.white)),
           ),
         ),
       );
+
+  /// iOS menüleri gibi: sağ üstten büyüyerek açılır, küçülerek kapanır.
+  Widget _pop(bool open, Widget panel) {
+    final p = panel as Positioned;
+    return Positioned(
+      left: p.left,
+      top: p.top,
+      right: p.right,
+      bottom: p.bottom,
+      width: p.width,
+      height: p.height,
+      child: IgnorePointer(
+        ignoring: !open,
+        child: AnimatedOpacity(
+          opacity: open ? 1 : 0,
+          duration: Duration(milliseconds: open ? 180 : 140),
+          child: AnimatedScale(
+            scale: open ? 1 : .9,
+            alignment: Alignment.topRight,
+            duration: Duration(milliseconds: open ? 280 : 160),
+            curve: open ? Curves.easeOutBack : Curves.easeInCubic,
+            child: ExcludeSemantics(excluding: !open, child: p.child),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _seekBtn(int s) => Semantics(
         button: true,
@@ -1656,4 +1695,49 @@ Widget subtitleText(String text, {double scale = 1}) {
     ),
     child: t,
   );
+}
+
+/// Tasarımdaki çizgisel simgeler (24'lük ızgara): Görüntü, Ses ve altyazı, Bölümler
+class _CapIcon extends CustomPainter {
+  final String kind;
+  final Color color;
+  const _CapIcon(this.kind, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final k = (kind == 'sun' ? 19 : 20) / 24;
+    canvas.translate((size.width - 24 * k) / 2, (size.height - 24 * k) / 2);
+    canvas.scale(k);
+    final pen = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    void line(double a, double b, double c, double d) => canvas.drawLine(Offset(a, b), Offset(c, d), pen);
+    switch (kind) {
+      case 'sun':
+        canvas.drawCircle(const Offset(12, 12), 4, pen);
+        line(12, 2, 12, 4);
+        line(12, 20, 12, 22);
+        line(2, 12, 4, 12);
+        line(20, 12, 22, 12);
+        line(4.9, 4.9, 6.3, 6.3);
+        line(17.7, 17.7, 19.1, 19.1);
+        line(4.9, 19.1, 6.3, 17.7);
+        line(17.7, 6.3, 19.1, 4.9);
+      case 'cc':
+        canvas.drawRRect(RRect.fromLTRBR(3, 5, 21, 19, const Radius.circular(3)), pen);
+        line(7, 13, 11, 13);
+        line(13, 13, 17, 13);
+        line(7, 16, 17, 16);
+      case 'eps':
+        canvas.drawRRect(RRect.fromLTRBR(3, 6, 16, 18, const Radius.circular(2)), pen);
+        line(19, 8, 19, 16);
+        line(22, 9.5, 22, 14.5);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CapIcon o) => o.kind != kind || o.color != color;
 }
