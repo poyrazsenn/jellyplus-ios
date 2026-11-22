@@ -3,6 +3,5 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['next', 'Oynatıcıda yeni simgeler', 'Görüntü, ses ve altyazı ve bölümler düğmeleri tasarımdaki ince çizgili simgelere geçti.'],
-  ['next', 'iOS animasyonları', 'Oynatıcı büyüyerek açılıp küçülerek kapanıyor. Görüntü ve ses/altyazı menüleri sağ üstten açılıp kapanıyor, bölümler şeridi kayarak geliyor.'],
+  ['top', 'Top 10 düzeltmesi', 'Liste artık Jellyfin\'deki TMDB numaralarıyla eşleşiyor; Seerr\'in kendi kütüphane taraması gerekmiyor. Seerr bağlı değilse ya da ulaşılamıyorsa ana sayfada nedenini yazan bir kart çıkıyor.'],
 ];

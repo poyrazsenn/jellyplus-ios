@@ -1,5 +1,9 @@
-## Poyraz Player 3.0 — beta 10
+## Poyraz Player 3.0 — beta 11
 **Yenilikler**
+
+- **Top 10 düzeltmesi:** Liste artık Jellyfin'deki TMDB numaralarıyla eşleşiyor; Seerr'in kendi kütüphane taraması gerekmiyor. Seerr bağlı değilse ya da ulaşılamıyorsa ana sayfada nedenini yazan bir kart çıkıyor.
+
+**Beta 10'da gelenler**
 
 - **Oynatıcıda yeni simgeler:** Görüntü, ses ve altyazı ve bölümler düğmeleri tasarımdaki ince çizgili simgelere geçti.
 - **iOS animasyonları:** Oynatıcı büyüyerek açılıp küçülerek kapanıyor. Görüntü ve ses/altyazı menüleri sağ üstten açılıp kapanıyor, bölümler şeridi kayarak geliyor.
@@ -58,6 +62,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** iPad düzeni (beta 11), uzun basınca önizleme menüsü ve ortak ayarlar (beta 12), web istemcisinin yeni görünümü.
+**Sonraki betalarda:** iPad düzeni (beta 12), uzun basınca önizleme menüsü ve ortak ayarlar (beta 13), web istemcisinin yeni görünümü.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.

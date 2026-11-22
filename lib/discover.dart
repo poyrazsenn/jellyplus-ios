@@ -18,57 +18,57 @@ class Discover {
   List<J>? _top;
   DateTime _topAt = DateTime(2000);
 
-  /// Bugün popüler olanlardan sunucunda bulunan ilk 10 (Seerr gerekiyor).
+  /// Son durum (ana sayfada açıklama göstermek için): '', seerr, err, none
+  String topNote = '';
+
+  /// Bugün popüler olanlardan sunucunda bulunan ilk 10.
+  /// Popüler listesi Seerr'den gelir; eşleşme Jellyfin'deki TMDB numarasıyla yapılır,
+  /// Seerr'in kendi kütüphane taramasına güvenilmez.
   Future<List<J>> top10() async {
-    if (_top != null && DateTime.now().difference(_topAt).inMinutes < 30) return _top!;
-    if (!Seerr.I.on) return const [];
-    final pages = await Future.wait([1, 2, 3, 4].map((p) => Seerr.I.trending(page: p).catchError((_) => <J>[])));
-    final avail = <J>[];
-    final seen = <String>{};
-    for (final x in pages.expand((l) => l)) {
-      final mi = x['mediaInfo'] as Map?;
-      final st = (mi?['status'] as num?)?.toInt() ?? 0;
-      if (st != 5 && st != 4) continue; // 5: mevcut, 4: kısmen mevcut
-      if (!seen.add('${x['mediaType']}${x['id']}')) continue;
-      avail.add(x);
-      if (avail.length >= 14) break;
+    if (_top != null && _top!.isNotEmpty && DateTime.now().difference(_topAt).inMinutes < 30) return _top!;
+    topNote = '';
+    if (!Seerr.I.on) {
+      topNote = 'seerr';
+      return const [];
     }
-    final found = await Future.wait(avail.map(_match));
+    final u = api.uid;
+    List<List<J>> pages;
+    try {
+      pages = await Future.wait([1, 2, 3, 4, 5].map((p) => Seerr.I.trending(page: p)));
+    } catch (e) {
+      topNote = 'err';
+      return const [];
+    }
+    final lib = await api.items('/Users/$u/Items?IncludeItemTypes=Movie,Series&Recursive=true'
+        '&Fields=ProviderIds,OriginalTitle,$kFields&EnableImageTypes=Primary,Backdrop,Thumb,Logo&ImageTypeLimit=1');
+    final byTmdb = <String, J>{};
+    final byName = <String, J>{};
+    for (final x in lib) {
+      final t = (x['ProviderIds'] as Map?)?['Tmdb'];
+      final kind = x['Type'] == 'Series' ? 'tv' : 'movie';
+      if (t != null && '$t'.isNotEmpty) byTmdb['$kind$t'] = x;
+      byName['$kind|${_norm('${x['Name'] ?? ''}')}|${x['ProductionYear'] ?? ''}'] = x;
+      byName.putIfAbsent('$kind|${_norm('${x['OriginalTitle'] ?? ''}')}|${x['ProductionYear'] ?? ''}', () => x);
+    }
     final out = <J>[];
     final ids = <String>{};
-    for (final j in found) {
+    for (final r in pages.expand((l) => l)) {
+      final kind = '${r['mediaType']}';
+      final year = '${r['releaseDate'] ?? r['firstAirDate'] ?? ''}'.split('-').first;
+      J? j = byTmdb['$kind${r['id']}'];
+      j ??= byName['$kind|${_norm('${r['title'] ?? r['name'] ?? ''}')}|$year'];
+      j ??= byName['$kind|${_norm('${r['originalTitle'] ?? r['originalName'] ?? ''}')}|$year'];
       if (j == null || !ids.add('${j['Id']}')) continue;
       out.add(j);
       if (out.length == 10) break;
     }
+    if (out.isEmpty) topNote = 'none';
     _top = out;
     _topAt = DateTime.now();
     return out;
   }
 
-  /// Seerr sonucunu Jellyfin öğesine çevirir: önce kayıtlı Jellyfin kimliği, yoksa ad + yıl.
-  Future<J?> _match(J x) async {
-    final u = api.uid;
-    final jid = (x['mediaInfo'] as Map?)?['jellyfinMediaId'];
-    if (jid != null && '$jid'.isNotEmpty) {
-      try {
-        final l = await api.items('/Users/$u/Items?Ids=$jid&Fields=$kFields');
-        if (l.isNotEmpty) return l.first;
-      } catch (_) {}
-    }
-    final title = '${x['title'] ?? x['name'] ?? ''}';
-    if (title.isEmpty) return null;
-    final year = '${x['releaseDate'] ?? x['firstAirDate'] ?? ''}'.split('-').first;
-    final type = x['mediaType'] == 'tv' ? 'Series' : 'Movie';
-    try {
-      final l = await api.items('/Users/$u/Items?searchTerm=${Uri.encodeQueryComponent(title)}'
-          '&IncludeItemTypes=$type&Recursive=true&Limit=6&Fields=$kFields');
-      if (l.isEmpty) return null;
-      return l.firstWhere((e) => '${e['ProductionYear'] ?? ''}' == year, orElse: () => l.first);
-    } catch (_) {
-      return null;
-    }
-  }
+  static String _norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9çğıöşü]'), '');
 
   /// Takip ettiğin dizilerin çıkacak bölümleri (Jellyfin'in bildiği tarihler).
   Future<List<J>> upcoming() async {
@@ -135,8 +135,32 @@ class Top10Shelf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.length < 3) return const SizedBox.shrink();
     final pad = hPad(context);
+    if (items.isEmpty) {
+      final note = Discover.I.topNote;
+      if (note.isEmpty) return const SizedBox.shrink();
+      final msg = note == 'seerr'
+          ? 'Top 10 listesi Seerr üzerinden gelir. Profil → Seerr\'den bağlayınca burada görünür.'
+          : note == 'err'
+              ? 'Top 10 için Seerr\'e ulaşılamadı. Profil → Seerr\'den bağlantıyı dene.'
+              : 'Bugünün popüler yapımlarından hiçbiri arşivinde yok.';
+      return Padding(
+        padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),
+        child: Pressable(
+          onTap: note == 'none' ? null : () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const SeerrSettingsScreen())),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: Colors.white.withAlpha(13), borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
+              const Icon(Icons.emoji_events_outlined, color: kAccent),
+              const SizedBox(width: 12),
+              Expanded(child: Text(msg, style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xB8F5F5F7)))),
+              if (note != 'none') const Icon(Icons.chevron_right_rounded, color: _muted),
+            ]),
+          ),
+        ),
+      );
+    }
     final w = MediaQuery.sizeOf(context).width > 700 ? 150.0 : 122.0;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
