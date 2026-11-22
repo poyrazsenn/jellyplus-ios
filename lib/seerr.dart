@@ -107,6 +107,12 @@ class Seerr {
     return r is Map ? J.from(r) : null;
   }
 
+  /// Sezonun bölüm listesi ve yayın tarihleri
+  Future<List<J>> season(String tmdbId, int n) async {
+    final r = await _req('GET', '/tv/$tmdbId/season/$n?language=tr');
+    return (((r as Map?)?['episodes'] as List?) ?? const []).map((e) => J.from(e as Map)).toList();
+  }
+
   /// TMDB "bugün popüler" listesi (Seerr üzerinden; ayrı anahtar gerekmez).
   Future<List<J>> trending({int page = 1}) async {
     final r = await _req('GET', '/discover/trending?page=$page&language=tr');

@@ -1,5 +1,9 @@
-## Poyraz Player 3.0 — beta 12
+## Poyraz Player 3.0 — beta 13
 **Yenilikler**
+
+- **Yakında düzeltmesi:** Sunucunda zaten olan bölümler artık "yakında" görünmüyor; yerine sezon takvimindeki gerçekten sıradaki bölüm geliyor.
+
+**Beta 12'de gelenler**
 
 - **Yakında artık Seerr'den:** Kütüphanendeki devam eden dizilerin yeni bölüm tarihleri Seerr'den (TMDB) geliyor; Jellyfin'in bilmediği bölümler de görünüyor.
 - **Dizi sayfasında yeni bölüm:** Devam eden bir dizinin sayfasında "Yeni bölüm · Cuma, 27 Kasım" kartı; bölüm numarası, adı ve kaç gün kaldığı.

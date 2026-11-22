@@ -83,24 +83,52 @@ class Discover {
     try {
       final d = await Seerr.I.tv('$tmdb');
       final n = d?['nextEpisodeToAir'] as Map?;
-      final when = DateTime.tryParse('${n?['airDate'] ?? ''}');
-      if (n != null && when != null) {
-        final still = '${n['stillPath'] ?? ''}';
-        out = <String, dynamic>{
-          'Type': 'Episode',
-          'Id': sid,
-          'SeriesId': sid,
-          'SeriesName': series['Name'],
-          'Name': n['name'],
-          'ParentIndexNumber': n['seasonNumber'],
-          'IndexNumber': n['episodeNumber'],
-          'PremiereDate': '${n['airDate']}',
-          'ImageTags': {if ((series['ImageTags'] as Map?)?['Thumb'] != null) 'Thumb': series['ImageTags']['Thumb']},
-          'BackdropImageTags': series['BackdropImageTags'] ?? const [],
-          'SeriesPrimaryImageTag': (series['ImageTags'] as Map?)?['Primary'],
-          if (still.isNotEmpty) '_img': 'https://image.tmdb.org/t/p/w780$still',
-          '_seerr': true,
-        };
+      if (n != null) {
+        // Sunucunda zaten olan bölümler "yakında" sayılmaz: sezon takviminden ilk eksik bölümü bul.
+        final have = <String>{};
+        try {
+          final l = await api.items('/Shows/$sid/Episodes?UserId=${api.uid}&IsMissing=false&Fields=');
+          for (final e in l) {
+            if (e['LocationType'] == 'Virtual') continue;
+            have.add('${e['ParentIndexNumber']}x${e['IndexNumber']}');
+          }
+        } catch (_) {}
+        final today = DateTime.now();
+        final start = DateTime(today.year, today.month, today.day);
+        J? pick;
+        final sn = (n['seasonNumber'] as num?)?.toInt() ?? 0;
+        if (!have.contains('${n['seasonNumber']}x${n['episodeNumber']}')) {
+          pick = J.from(n);
+        } else {
+          try {
+            for (final e in await Seerr.I.season('$tmdb', sn)) {
+              final when = DateTime.tryParse('${e['airDate'] ?? ''}');
+              if (when == null || when.isBefore(start)) continue;
+              if (have.contains('${e['seasonNumber'] ?? sn}x${e['episodeNumber']}')) continue;
+              pick = e;
+              break;
+            }
+          } catch (_) {}
+        }
+        final when = DateTime.tryParse('${pick?['airDate'] ?? ''}');
+        if (pick != null && when != null) {
+          final still = '${pick['stillPath'] ?? ''}';
+          out = <String, dynamic>{
+            'Type': 'Episode',
+            'Id': sid,
+            'SeriesId': sid,
+            'SeriesName': series['Name'],
+            'Name': pick['name'],
+            'ParentIndexNumber': pick['seasonNumber'] ?? sn,
+            'IndexNumber': pick['episodeNumber'],
+            'PremiereDate': '${pick['airDate']}',
+            'ImageTags': {if ((series['ImageTags'] as Map?)?['Thumb'] != null) 'Thumb': series['ImageTags']['Thumb']},
+            'BackdropImageTags': series['BackdropImageTags'] ?? const [],
+            'SeriesPrimaryImageTag': (series['ImageTags'] as Map?)?['Primary'],
+            if (still.isNotEmpty) '_img': 'https://image.tmdb.org/t/p/w780$still',
+            '_seerr': true,
+          };
+        }
       }
     } catch (_) {
       return null; // ağ hatası: önbelleğe yazma, sonra tekrar dene
@@ -117,7 +145,7 @@ class Discover {
     final start = DateTime(today.year, today.month, today.day);
     final r = await Future.wait<List<J>>([
       api
-          .items('/Shows/Upcoming?UserId=$u&Limit=80&Fields=$kFields,PremiereDate'
+          .items('/Shows/Upcoming?UserId=$u&Limit=80&Fields=$kFields,PremiereDate,LocationType'
               '&EnableImageTypes=Primary,Backdrop,Thumb&ImageTypeLimit=1')
           .catchError((_) => <J>[]),
       Seerr.I.on
@@ -136,7 +164,7 @@ class Discover {
     }
     final seen = <String>{};
     final all = <J>[];
-    for (final e in [...r[0], ...fromSeerr]) {
+    for (final e in [...r[0].where((e) => e['LocationType'] == 'Virtual' || e['LocationType'] == null), ...fromSeerr]) {
       final d = premiere(e);
       if (d == null || d.isBefore(start)) continue;
       if (!seen.add('${e['SeriesId']}|${e['ParentIndexNumber']}|${e['IndexNumber']}')) continue;
