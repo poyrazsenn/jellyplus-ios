@@ -101,6 +101,12 @@ class Seerr {
     return l;
   }
 
+  /// Dizi ayrıntısı (nextEpisodeToAir, status…)
+  Future<J?> tv(String tmdbId) async {
+    final r = await _req('GET', '/tv/$tmdbId?language=tr');
+    return r is Map ? J.from(r) : null;
+  }
+
   /// TMDB "bugün popüler" listesi (Seerr üzerinden; ayrı anahtar gerekmez).
   Future<List<J>> trending({int page = 1}) async {
     final r = await _req('GET', '/discover/trending?page=$page&language=tr');

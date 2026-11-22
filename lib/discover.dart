@@ -70,17 +70,79 @@ class Discover {
 
   static String _norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9çğıöşü]'), '');
 
-  /// Takip ettiğin dizilerin çıkacak bölümleri (Jellyfin'in bildiği tarihler).
+  final Map<String, (DateTime, J?)> _next = {}; // dizi id → (ne zaman alındı, sıradaki bölüm)
+
+  /// Bir dizinin sıradaki bölümü, Seerr (TMDB) bilgisiyle. Yoksa null.
+  Future<J?> nextEpisode(J series) async {
+    final sid = '${series['Id']}';
+    final c = _next[sid];
+    if (c != null && DateTime.now().difference(c.$1).inHours < 6) return c.$2;
+    final tmdb = (series['ProviderIds'] as Map?)?['Tmdb'];
+    if (!Seerr.I.on || tmdb == null || '$tmdb'.isEmpty) return null;
+    J? out;
+    try {
+      final d = await Seerr.I.tv('$tmdb');
+      final n = d?['nextEpisodeToAir'] as Map?;
+      final when = DateTime.tryParse('${n?['airDate'] ?? ''}');
+      if (n != null && when != null) {
+        final still = '${n['stillPath'] ?? ''}';
+        out = <String, dynamic>{
+          'Type': 'Episode',
+          'Id': sid,
+          'SeriesId': sid,
+          'SeriesName': series['Name'],
+          'Name': n['name'],
+          'ParentIndexNumber': n['seasonNumber'],
+          'IndexNumber': n['episodeNumber'],
+          'PremiereDate': '${n['airDate']}',
+          'ImageTags': {if ((series['ImageTags'] as Map?)?['Thumb'] != null) 'Thumb': series['ImageTags']['Thumb']},
+          'BackdropImageTags': series['BackdropImageTags'] ?? const [],
+          'SeriesPrimaryImageTag': (series['ImageTags'] as Map?)?['Primary'],
+          if (still.isNotEmpty) '_img': 'https://image.tmdb.org/t/p/w780$still',
+          '_seerr': true,
+        };
+      }
+    } catch (_) {
+      return null; // ağ hatası: önbelleğe yazma, sonra tekrar dene
+    }
+    _next[sid] = (DateTime.now(), out);
+    return out;
+  }
+
+  /// Kütüphanendeki devam eden dizilerin çıkacak bölümleri.
+  /// Tarihler Seerr'den (TMDB) gelir; Jellyfin'in bildiği gelecek bölümler de eklenir.
   Future<List<J>> upcoming() async {
-    final l = await api.items('/Shows/Upcoming?UserId=${api.uid}&Limit=80&Fields=$kFields,PremiereDate'
-        '&EnableImageTypes=Primary,Backdrop,Thumb&ImageTypeLimit=1');
+    final u = api.uid;
     final today = DateTime.now();
     final start = DateTime(today.year, today.month, today.day);
-    return l.where((e) {
+    final r = await Future.wait<List<J>>([
+      api
+          .items('/Shows/Upcoming?UserId=$u&Limit=80&Fields=$kFields,PremiereDate'
+              '&EnableImageTypes=Primary,Backdrop,Thumb&ImageTypeLimit=1')
+          .catchError((_) => <J>[]),
+      Seerr.I.on
+          ? api
+              .items('/Users/$u/Items?IncludeItemTypes=Series&Recursive=true&SeriesStatus=Continuing'
+                  '&Fields=ProviderIds,$kFields&EnableImageTypes=Primary,Backdrop,Thumb&ImageTypeLimit=1')
+              .catchError((_) => <J>[])
+          : Future.value(<J>[]),
+    ]);
+    final fromSeerr = <J>[];
+    final shows = r[1];
+    for (var i = 0; i < shows.length; i += 8) {
+      final part = shows.sublist(i, i + 8 > shows.length ? shows.length : i + 8);
+      final got = await Future.wait(part.map(nextEpisode));
+      fromSeerr.addAll(got.whereType<J>());
+    }
+    final seen = <String>{};
+    final all = <J>[];
+    for (final e in [...r[0], ...fromSeerr]) {
       final d = premiere(e);
-      return d != null && !d.isBefore(start);
-    }).toList()
-      ..sort((a, b) => premiere(a)!.compareTo(premiere(b)!));
+      if (d == null || d.isBefore(start)) continue;
+      if (!seen.add('${e['SeriesId']}|${e['ParentIndexNumber']}|${e['IndexNumber']}')) continue;
+      all.add(e);
+    }
+    return all..sort((a, b) => premiere(a)!.compareTo(premiere(b)!));
   }
 
   static DateTime? premiere(J e) => DateTime.tryParse('${e['PremiereDate'] ?? ''}')?.toLocal();
@@ -383,7 +445,7 @@ class _UpcomingScreenState extends State<UpcomingScreen> {
                 padding: EdgeInsets.fromLTRB(40, 0, 40, 120),
                 child: Center(
                   child: Text(
-                      'Yakında çıkacak bölüm yok. Jellyfin, takip ettiğin dizilerin yayın tarihi belli olan bölümlerini burada gösterir.',
+                      'Yakında çıkacak bölüm yok. Kütüphanendeki devam eden dizilerin yeni bölüm tarihi açıklanınca burada görünür.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: _muted, height: 1.4)),
                 ),
@@ -521,5 +583,47 @@ class SeriesOrderShelf extends StatelessWidget {
       ),
       const SizedBox(height: 10),
     ]);
+  }
+}
+
+/// Dizi sayfası: "Yeni bölüm · Cuma, 27 Kasım"
+class NextEpisodeRow extends StatelessWidget {
+  final J ep;
+  const NextEpisodeRow(this.ep, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final d = Discover.premiere(ep)!;
+    final days = DateTime(d.year, d.month, d.day)
+        .difference(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day))
+        .inDays;
+    final when = dayLabel(d);
+    final left = days >= 2 ? '$days gün sonra' : '';
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(18),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withAlpha(20)),
+      ),
+      child: Row(children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: kAccent.withAlpha(36), borderRadius: BorderRadius.circular(12)),
+          child: const Icon(Icons.calendar_month_outlined, size: 20, color: kAccent),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Yeni bölüm · $when', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text([_epLine(ep), if (left.isNotEmpty) left].where((x) => x.isNotEmpty).join(' · '),
+                maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _muted)),
+          ]),
+        ),
+      ]),
+    );
   }
 }

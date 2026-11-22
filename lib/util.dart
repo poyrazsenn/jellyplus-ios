@@ -91,6 +91,7 @@ class WideImg {
 
 WideImg wideImg(J it) {
   final a = Api.I;
+  if ('${it['_img'] ?? ''}'.isNotEmpty) return WideImg('${it['_img']}');
   final t = (it['ImageTags'] as Map?) ?? const {};
   final bdt = (it['BackdropImageTags'] as List?) ?? const [];
   final pbdt = (it['ParentBackdropImageTags'] as List?) ?? const [];

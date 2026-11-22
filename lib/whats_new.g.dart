@@ -3,5 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['top', 'Top 10 düzeltmesi', 'Liste artık Jellyfin\'deki TMDB numaralarıyla eşleşiyor; Seerr\'in kendi kütüphane taraması gerekmiyor. Seerr bağlı değilse ya da ulaşılamıyorsa ana sayfada nedenini yazan bir kart çıkıyor.'],
+  ['calendar', 'Yakında artık Seerr\'den', 'Kütüphanendeki devam eden dizilerin yeni bölüm tarihleri Seerr\'den (TMDB) geliyor; Jellyfin\'in bilmediği bölümler de görünüyor.'],
+  ['next', 'Dizi sayfasında yeni bölüm', 'Devam eden bir dizinin sayfasında "Yeni bölüm · Cuma, 27 Kasım" kartı; bölüm numarası, adı ve kaç gün kaldığı.'],
 ];

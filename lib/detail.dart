@@ -27,6 +27,7 @@ class _DetailScreenState extends State<DetailScreen> {
   J? pit; // oynatılacak öğe (dizide devam edilecek bölüm)
   List<J> eps = [], similar = [], extras = [];
   ({J box, List<J> items})? order;
+  J? nextEp;
   num? season;
   String tab = '';
   String err = '';
@@ -94,6 +95,11 @@ class _DetailScreenState extends State<DetailScreen> {
         if (tab.isEmpty) tab = e.isNotEmpty ? 'eps' : 'sim';
         err = '';
       });
+      if (x['Type'] == 'Series' && nextEp == null) {
+        Discover.I.nextEpisode(x).then((n) {
+          if (mounted && n != null) setState(() => nextEp = n);
+        }).catchError((_) {});
+      }
       if (x['Type'] == 'Movie' && order == null) {
         Discover.I.seriesOrder(id).then((o) {
           if (mounted && o != null) setState(() => order = o);
@@ -286,6 +292,7 @@ class _DetailScreenState extends State<DetailScreen> {
               _act(seen ? Icons.visibility : Icons.visibility_outlined, seen ? 'İzlendi' : 'İzlenmedi',
                   () => flag('seen', !seen)),
             ]),
+            if (nextEp != null) NextEpisodeRow(nextEp!),
             if ('${x['Overview'] ?? ''}'.isNotEmpty)
               GestureDetector(
                 onTap: () => setState(() => moreText = !moreText),
