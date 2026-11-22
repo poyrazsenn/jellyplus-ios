@@ -574,7 +574,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final tablet = isTablet(context);
+    final tablet = wideLayout(context);
     final mq = MediaQuery.of(context);
     final stack = IndexedStack(index: tab, children: [
       tabNav(0, const HomeScreen()),

@@ -14,7 +14,7 @@ const kMuted = Color(0xFF9C9CA6);
 const kGlass = Color(0x9926262C); // buğulu cam dolgusu
 
 /// iPad (ya da geniş pencere): üst sekme kapsülü
-bool isTablet(BuildContext c) => MediaQuery.sizeOf(c).width > 700;
+bool wideLayout(BuildContext c) => MediaQuery.sizeOf(c).width > 700;
 
 /// Yatay iPad: iki sütunlu detay sayfası
 bool isSplit(BuildContext c) => MediaQuery.sizeOf(c).width >= 900;

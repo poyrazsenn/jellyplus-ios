@@ -173,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     SliverToBoxAdapter(
                       child: Stack(children: [
                         HeroCarousel(feat),
-                        if (!isTablet(context))
+                        if (!wideLayout(context))
                         Positioned(
                           left: pad + 4,
                           right: pad,
