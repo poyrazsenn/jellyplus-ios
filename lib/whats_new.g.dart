@@ -3,6 +3,5 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['request', 'Android parçaları temizlendi', 'Giriş, profil seçimi, oyuncu sayfası, İsteklerim, Seerr bağlantısı ve altyazı arama iOS düzenine geçti. Büyük başlıklar, cam metin kutuları, beyaz kapsül düğmeler.'],
-  ['update', 'iOS uyarıları', 'Güncelleme uyarısı iPhone\'un kendi uyarı penceresi; bildirimler alttan çıkan yuvarlak kapsül.'],
+  ['calendar', 'Yakında: doğru yayın günleri', 'Yeni bölüm tarihleri artık TVmaze\'den geliyor; dijital platformda çıkan diziler (ör. Paramount+\'ta Cuma) doğru günde görünüyor. Bölüm adları ve görselleri yine Seerr\'den Türkçe.'],
 ];

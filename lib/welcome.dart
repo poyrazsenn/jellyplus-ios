@@ -193,6 +193,9 @@ const _icons = {
   'update': Icons.new_releases_outlined,
   'audio': Icons.graphic_eq,
   'night': Icons.nightlight_outlined,
+  'top': Icons.emoji_events_outlined,
+  'calendar': Icons.calendar_month_outlined,
+  'order': Icons.format_list_numbered_rounded,
   'speed': Icons.speed,
 };
 

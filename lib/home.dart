@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'discover.dart';
 import 'nav.dart';
 import 'util.dart';
 import 'widgets.dart';
@@ -25,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String err = '';
   List<J> res = [], fav = [], feat = [], cols = [], libs = [];
   List<List<J>> lat = [];
+  List<J> top = [], soon = [];
   List<_Studio> studios = [];
 
   @override
@@ -106,11 +108,26 @@ class _HomeScreenState extends State<HomeScreen> {
         studios = st.take(10).toList();
         loading = false;
       });
+      _discover();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         loading = false;
         err = 'Ana sayfa yüklenemedi.\n$e';
+      });
+    }
+  }
+
+  /// Keşif sıraları ana sayfayı bekletmeden ayrıca gelir.
+  Future<void> _discover() async {
+    final r = await Future.wait<List<J>>([
+      Discover.I.top10().catchError((_) => <J>[]),
+      Discover.I.upcoming().catchError((_) => <J>[]),
+    ]);
+    if (mounted) {
+      setState(() {
+        top = r[0];
+        soon = r[1];
       });
     }
   }
@@ -204,6 +221,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     SliverToBoxAdapter(child: Shelf('İzlemeye devam et', res, resume: true)),
+                    SliverToBoxAdapter(child: Top10Shelf(top)),
+                    SliverToBoxAdapter(child: UpcomingShelf(soon)),
                     SliverToBoxAdapter(child: Shelf('Listem', fav, more: () => tabBus.value = 2)),
                     for (var i = 0; i < libs.length && i < lat.length; i++)
                       SliverToBoxAdapter(

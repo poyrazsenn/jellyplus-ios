@@ -101,6 +101,27 @@ class Seerr {
     return l;
   }
 
+  /// Dizi ayrıntısı (nextEpisodeToAir, status…)
+  Future<J?> tv(String tmdbId) async {
+    final r = await _req('GET', '/tv/$tmdbId?language=tr');
+    return r is Map ? J.from(r) : null;
+  }
+
+  /// Sezonun bölüm listesi ve yayın tarihleri
+  Future<List<J>> season(String tmdbId, int n) async {
+    final r = await _req('GET', '/tv/$tmdbId/season/$n?language=tr');
+    return (((r as Map?)?['episodes'] as List?) ?? const []).map((e) => J.from(e as Map)).toList();
+  }
+
+  /// TMDB "bugün popüler" listesi (Seerr üzerinden; ayrı anahtar gerekmez).
+  Future<List<J>> trending({int page = 1}) async {
+    final r = await _req('GET', '/discover/trending?page=$page&language=tr');
+    return (((r as Map?)?['results'] as List?) ?? const [])
+        .map((e) => J.from(e as Map))
+        .where((e) => e['mediaType'] == 'movie' || e['mediaType'] == 'tv')
+        .toList();
+  }
+
   static String poster(dynamic p, [int w = 185]) => p == null || '$p'.isEmpty ? '' : 'https://image.tmdb.org/t/p/w$w$p';
 
   /// Medya durumu (+ istek durumu) → kısa Türkçe etiket, renk, indirme yüzdesi.

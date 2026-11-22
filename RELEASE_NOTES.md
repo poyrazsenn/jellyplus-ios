@@ -1,6 +1,34 @@
-## Poyraz Player 3.0 — beta 8
-
+## Poyraz Player 3.0 — beta 14
 **Yenilikler**
+
+- **Yakında: doğru yayın günleri:** Yeni bölüm tarihleri artık TVmaze'den geliyor; dijital platformda çıkan diziler (ör. Paramount+'ta Cuma) doğru günde görünüyor. Bölüm adları ve görselleri yine Seerr'den Türkçe.
+
+**Beta 13'te gelenler**
+
+- **Yakında düzeltmesi:** Sunucunda zaten olan bölümler artık "yakında" görünmüyor; yerine sezon takvimindeki gerçekten sıradaki bölüm geliyor.
+
+**Beta 12'de gelenler**
+
+- **Yakında artık Seerr'den:** Kütüphanendeki devam eden dizilerin yeni bölüm tarihleri Seerr'den (TMDB) geliyor; Jellyfin'in bilmediği bölümler de görünüyor.
+- **Dizi sayfasında yeni bölüm:** Devam eden bir dizinin sayfasında "Yeni bölüm · Cuma, 27 Kasım" kartı; bölüm numarası, adı ve kaç gün kaldığı.
+
+**Beta 11'de gelenler**
+
+- **Top 10 düzeltmesi:** Liste artık Jellyfin'deki TMDB numaralarıyla eşleşiyor; Seerr'in kendi kütüphane taraması gerekmiyor. Seerr bağlı değilse ya da ulaşılamıyorsa ana sayfada nedenini yazan bir kart çıkıyor.
+
+**Beta 10'da gelenler**
+
+- **Oynatıcıda yeni simgeler:** Görüntü, ses ve altyazı ve bölümler düğmeleri tasarımdaki ince çizgili simgelere geçti.
+- **iOS animasyonları:** Oynatıcı büyüyerek açılıp küçülerek kapanıyor. Görüntü ve ses/altyazı menüleri sağ üstten açılıp kapanıyor, bölümler şeridi kayarak geliyor.
+
+**Beta 9'da gelenler**
+
+- **Bugün Top 10:** Ana sayfada, dünyada bugün en popüler yapımlardan arşivinde olan ilk 10. Liste Seerr üzerinden gelir, Seerr bağlıyken görünür.
+- **Yakında:** Takip ettiğin dizilerin çıkacak bölümleri. Ana sayfadaki sıraya dokununca günlere göre ayrılmış takvim açılır.
+- **Seri sırası:** Bir koleksiyondaki filmin sayfasında, serinin bütün filmleri çıkış sırasıyla. İzlediklerin işaretli, açtığın film vurgulu.
+
+
+**Beta 8'de gelenler**
 
 - **Android parçaları temizlendi:** Giriş, profil seçimi, oyuncu sayfası, İsteklerim, Seerr bağlantısı ve altyazı arama iOS düzenine geçti. Büyük başlıklar, cam metin kutuları, beyaz kapsül düğmeler.
 - **iOS uyarıları:** Güncelleme uyarısı iPhone'un kendi uyarı penceresi; bildirimler alttan çıkan yuvarlak kapsül.
@@ -47,6 +75,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** iPad düzeni, Top 10, "Yakında" takvimi, seri sırası, ortak ayarlar, oynatıcıda cam ses/altyazı menüsü, uzun basınca önizleme menüsü, arama ve İndirilenler'in yeni görünümü, web istemcisi.
+**Sonraki betalarda:** iPad düzeni, uzun basınca önizleme menüsü, ortak ayarlar, web istemcisinin yeni görünümü.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.
