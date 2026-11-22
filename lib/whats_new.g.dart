@@ -3,5 +3,6 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['calendar', 'Yakında: doğru yayın günleri', 'Yeni bölüm tarihleri artık TVmaze\'den geliyor; dijital platformda çıkan diziler (ör. Paramount+\'ta Cuma) doğru günde görünüyor. Bölüm adları ve görselleri yine Seerr\'den Türkçe.'],
+  ['layout', 'iPad düzeni', 'iPad\'de alt bar yerine üstte cam sekme kapsülü; solda logo, sağda profil. Aynı uygulama, ekran genişliğine göre kendiliğinden geçiyor.'],
+  ['next', 'İki sütunlu detay', 'Yatay iPad\'de detay sayfası ikiye bölünüyor; solda görsel, bilgiler ve oynat, sağda bölümler ve sekmeler.'],
 ];

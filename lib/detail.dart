@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+import 'dart:ui' show ImageFilter;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -202,57 +204,8 @@ class _DetailScreenState extends State<DetailScreen> {
       return 'Devam et$ep${left > 0 ? ' · ${rt(left)} kaldı' : ''}';
     }
 
-    return Scaffold(
-      body: CustomScrollView(slivers: [
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: heroH,
-            child: Stack(fit: StackFit.expand, children: [
-              netImg(backdrop(x), align: const Alignment(.3, -.4)),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0x660B0B0D), Color(0x000B0B0D), Color(0xCC0B0B0D), kBg],
-                      stops: [0, .3, .78, 1]),
-                ),
-              ),
-              Positioned(
-                top: MediaQuery.paddingOf(context).top + 8,
-                left: 14,
-                child: GlassIcon(Icons.arrow_back_ios_new_rounded,
-                    tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
-              ),
-              if (hasTheme)
-                Positioned(
-                  top: MediaQuery.paddingOf(context).top + 8,
-                  right: 14,
-                  child: GlassIcon(api.themeOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                      tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç', onTap: () {
-                    setState(() => api.themeOn = !api.themeOn);
-                    api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
-                  }),
-                ),
-              Positioned(
-                left: pad,
-                right: pad,
-                bottom: 4,
-                height: heroH * .3,
-                child: lg != null
-                    ? CachedNetworkImage(
-                        imageUrl: lg,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.bottomLeft,
-                        errorWidget: (_, __, ___) => _title(x))
-                    : _title(x),
-              ),
-            ]),
-          ),
-        ),
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
-          sliver: SliverList.list(children: [
+    final info = <Widget>[
+
             Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
               Text(meta, style: const TextStyle(color: Color(0xB8F5F5F7), fontSize: 13)),
               for (final c in [if (ageLabel(x['OfficialRating']) != null) ageLabel(x['OfficialRating'])!, ...chips])
@@ -305,14 +258,8 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
               ),
             const SizedBox(height: 14),
-          ]),
-        ),
-        if (order != null)
-          SliverToBoxAdapter(child: SeriesOrderShelf(box: order!.box, items: order!.items, current: '${x['Id']}')),
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: pad),
-          sliver: SliverList.list(children: [
-            // sekmeler: iOS bölümlü seçici
+    ];
+    final tabBar = // sekmeler: iOS bölümlü seçici
             Container(
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(12)),
@@ -342,7 +289,174 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
                   ),
               ]),
+            );
+
+    if (isSplit(context)) {
+      final top = MediaQuery.paddingOf(context).top;
+      final lw = min(440.0, w * .38);
+      final rw = w - (56 + lw + 40) - 48;
+      return Scaffold(
+        backgroundColor: kBg,
+        body: Stack(children: [
+          Positioned.fill(
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+              child: netImg(backdrop(x)),
             ),
+          ),
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0x990B0B0D), Color(0xD90B0B0D), kBg],
+                  stops: [0, .55, 1],
+                ),
+              ),
+            ),
+          ),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(
+              width: 56 + lw + 40,
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(56, top + 64, 40, 40),
+                children: [
+                  Container(
+                    height: lw * 9 / 16,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: kCard,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 60, offset: Offset(0, 24))],
+                    ),
+                    child: Stack(fit: StackFit.expand, children: [
+                      netImg(backdrop(x), align: const Alignment(.3, -.4)),
+                      if (lg != null) ...[
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.center,
+                                colors: [Color(0x99000000), Color(0x00000000)]),
+                          ),
+                        ),
+                        Positioned(
+                          left: 18,
+                          bottom: 16,
+                          width: lw * .55,
+                          height: lw * .16,
+                          child: CachedNetworkImage(imageUrl: lg, fit: BoxFit.contain, alignment: Alignment.bottomLeft),
+                        ),
+                      ],
+                    ]),
+                  ),
+                  const SizedBox(height: 18),
+                  Text('${x['Name'] ?? ''}',
+                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -1.4, height: 1.05)),
+                  const SizedBox(height: 10),
+                  ...info,
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 48),
+                child: CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
+                  SliverToBoxAdapter(child: SizedBox(height: top + 64)),
+                  if (order != null)
+                    SliverToBoxAdapter(
+                        child: MediaQuery.removePadding(
+                            context: context,
+                            removeLeft: true,
+                            child: SeriesOrderShelf(box: order!.box, items: order!.items, current: '${x['Id']}'))),
+                  SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(bottom: 14), child: tabBar)),
+                  ..._tabBody(context, x, seasons, 0, area: rw),
+                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                ]),
+              ),
+            ),
+          ]),
+          Positioned(
+            top: top + 8,
+            left: 32,
+            child: GlassIcon(Icons.arrow_back_ios_new_rounded, size: 44, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
+          ),
+          if (hasTheme)
+            Positioned(
+              top: top + 8,
+              right: 32,
+              child: GlassIcon(api.themeOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                  tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç', onTap: () {
+                setState(() => api.themeOn = !api.themeOn);
+                api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
+              }),
+            ),
+        ]),
+      );
+    }
+
+    return Scaffold(
+      body: CustomScrollView(slivers: [
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: heroH,
+            child: Stack(fit: StackFit.expand, children: [
+              netImg(backdrop(x), align: const Alignment(.3, -.4)),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x660B0B0D), Color(0x000B0B0D), Color(0xCC0B0B0D), kBg],
+                      stops: [0, .3, .78, 1]),
+                ),
+              ),
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: 14,
+                child: GlassIcon(Icons.arrow_back_ios_new_rounded,
+                    tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
+              ),
+              if (hasTheme)
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 8,
+                  right: 14,
+                  child: GlassIcon(api.themeOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                      tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç', onTap: () {
+                    setState(() => api.themeOn = !api.themeOn);
+                    api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
+                  }),
+                ),
+              Positioned(
+                left: pad,
+                right: pad,
+                bottom: 4,
+                height: heroH * .3,
+                child: lg != null
+                    ? CachedNetworkImage(
+                        imageUrl: lg,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.bottomLeft,
+                        errorWidget: (_, __, ___) => _title(x))
+                    : _title(x),
+              ),
+            ]),
+          ),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
+          sliver: SliverList.list(children: [
+            ...info,
+          ]),
+        ),
+        if (order != null)
+          SliverToBoxAdapter(child: SeriesOrderShelf(box: order!.box, items: order!.items, current: '${x['Id']}')),
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: pad),
+          sliver: SliverList.list(children: [
+            tabBar,
             const SizedBox(height: 14),
           ]),
         ),
@@ -405,8 +519,8 @@ class _DetailScreenState extends State<DetailScreen> {
         ),
       );
 
-  List<Widget> _tabBody(BuildContext context, J x, List<num?> seasons, double pad) {
-    final w = MediaQuery.sizeOf(context).width;
+  List<Widget> _tabBody(BuildContext context, J x, List<num?> seasons, double pad, {double? area}) {
+    final w = area ?? MediaQuery.sizeOf(context).width;
     final cols = w > 1000 ? 4 : (w > 700 ? 3 : 2);
     SliverPadding grid(List<J> list, {bool play = false}) => SliverPadding(
           padding: EdgeInsets.symmetric(horizontal: pad),

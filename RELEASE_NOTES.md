@@ -1,5 +1,10 @@
-## Poyraz Player 3.0 — beta 14
+## Poyraz Player 3.0 — beta 15
 **Yenilikler**
+
+- **iPad düzeni:** iPad'de alt bar yerine üstte cam sekme kapsülü; solda logo, sağda profil. Aynı uygulama, ekran genişliğine göre kendiliğinden geçiyor.
+- **İki sütunlu detay:** Yatay iPad'de detay sayfası ikiye bölünüyor; solda görsel, bilgiler ve oynat, sağda bölümler ve sekmeler.
+
+**Beta 14'te gelenler**
 
 - **Yakında: doğru yayın günleri:** Yeni bölüm tarihleri artık TVmaze'den geliyor; dijital platformda çıkan diziler (ör. Paramount+'ta Cuma) doğru günde görünüyor. Bölüm adları ve görselleri yine Seerr'den Türkçe.
 
@@ -75,6 +80,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** iPad düzeni, uzun basınca önizleme menüsü, ortak ayarlar, web istemcisinin yeni görünümü.
+**Sonraki betalarda:** uzun basınca önizleme menüsü, ortak ayarlar, web istemcisinin yeni görünümü.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.

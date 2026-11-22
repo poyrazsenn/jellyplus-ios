@@ -60,7 +60,7 @@ class _WelcomeTourState extends State<WelcomeTour> {
             h: 150,
             r: 24)),
     _Card('Her şey yerinde',
-        'Girişlerin, indirdiklerin, izleme geçmişin ve ayarların olduğu gibi duruyor. iPad düzeni ve keşif özellikleri sonraki betalarda.',
+        'Girişlerin, indirdiklerin, izleme geçmişin ve ayarların olduğu gibi duruyor. iPad\'de üstte sekme kapsülü ve iki sütunlu sayfalar seni bekliyor.',
         const [Color(0xFF34506B), Color(0xFF16222E)],
         () => Container(
               width: 140,

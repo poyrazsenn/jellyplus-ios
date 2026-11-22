@@ -449,6 +449,83 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     );
   }
 
+  /// iPad: üstte logo, ortada cam sekme kapsülü, sağda profil.
+  Widget _topBar(BuildContext context) {
+    const labels = ['Ana sayfa', 'Ara', 'Listem', 'İndirilenler'];
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(36, 8, 36, 0),
+        child: SizedBox(
+          height: 50,
+          child: Stack(alignment: Alignment.center, children: [
+            Row(children: [
+              const Logo(size: 20),
+              const Spacer(),
+              Semantics(
+                button: true,
+                selected: tab == 4,
+                label: 'Profil',
+                child: Pressable(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _goTab(4);
+                  },
+                  child: Glass(
+                    radius: 20,
+                    color: tab == 4 ? const Color(0x52FFFFFF) : kGlass,
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Center(
+                        child: Text(Api.I.name.isEmpty ? '?' : Api.I.name[0].toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+            Glass(
+              radius: 26,
+              color: const Color(0xB326262C),
+              padding: const EdgeInsets.all(5),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                for (var i = 0; i < labels.length; i++)
+                  Semantics(
+                    button: true,
+                    selected: tab == i,
+                    label: labels[i],
+                    child: Pressable(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        _goTab(i);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: tab == i ? Colors.white.withAlpha(46) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(19),
+                        ),
+                        child: Text(labels[i],
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: tab == i ? FontWeight.w600 : FontWeight.w500,
+                                color: tab == i ? const Color(0xFFF5F5F7) : const Color(0xB3F5F5F7))),
+                      ),
+                    ),
+                  ),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -497,6 +574,15 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final tablet = isTablet(context);
+    final mq = MediaQuery.of(context);
+    final stack = IndexedStack(index: tab, children: [
+      tabNav(0, const HomeScreen()),
+      tabNav(1, const SearchScreen()),
+      tabNav(2, const LibraryScreen(title: 'Listem', extra: '&IsFavorite=true', root: true)),
+      tabNav(3, const DownloadsScreen()),
+      tabNav(4, const SettingsScreen()),
+    ]);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -504,13 +590,19 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         keys[tab].currentState?.maybePop();
       },
       child: Scaffold(
-        body: IndexedStack(index: tab, children: [
-          tabNav(0, const HomeScreen()),
-          tabNav(1, const SearchScreen()),
-          tabNav(2, const LibraryScreen(title: 'Listem', extra: '&IsFavorite=true', root: true)),
-          tabNav(3, const DownloadsScreen()),
-          tabNav(4, const SettingsScreen()),
-        ]),
+        body: tablet
+            ? Stack(children: [
+                // sayfalar, üst çubuğun altından başlasın diye üst boşluk büyütülür
+                MediaQuery(
+                  data: mq.copyWith(
+                    padding: mq.padding.copyWith(top: mq.padding.top + 60),
+                    viewPadding: mq.viewPadding.copyWith(top: mq.viewPadding.top + 60),
+                  ),
+                  child: stack,
+                ),
+                Positioned(left: 0, right: 0, top: 0, child: _topBar(context)),
+              ])
+            : stack,
         bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
           AnimatedSize(
             duration: const Duration(milliseconds: 250),
@@ -532,7 +624,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   )
                 : const SizedBox(width: double.infinity),
           ),
-          _glassBar(context),
+          if (!tablet) _glassBar(context) else SizedBox(height: mq.padding.bottom),
         ]),
       ),
     );
