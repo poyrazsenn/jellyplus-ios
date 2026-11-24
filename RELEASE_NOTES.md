@@ -1,5 +1,10 @@
-## Poyraz Player 3.0 — beta 16
+## Poyraz Player 3.0 — beta 17
 **Yenilikler**
+
+- **iPad'de tam ekran detay sayfası:** Görsel ekranı boydan boya kaplıyor; altında solda bilgiler, Oynat ve İndir yan yana, sağda oyuncular ve eylemler. Sekmeler ve afişler bütün genişliği kullanıyor.
+- **Güncelleme uyarısı düzeltmesi:** Sürüm adayları (RC) artık betalardan yeni sayılıyor; 3.0 RC çıkınca uyarı gelecek.
+
+**Beta 16'da gelenler**
 
 - **Yeni dizi ve film sayfası:** Üstte görsel, altında başlık, bilgi satırı, Devam et ve İndir düğmeleri, kalan süre, oyuncular ve simgeli eylemler. Sekmeler artık yazı halinde: Bölümler, Koleksiyon, Benzerleri, Detaylar.
 - **Koleksiyon sekmesi ve sayfası:** Seriye ait yapımların sayfasında Koleksiyon sekmesi; afişler çıkış sırasıyla numaralı. Koleksiyona girince kendi sayfası açılıyor: kaçını izlediğin ve "Sırayla izle" düğmesi.
@@ -86,6 +91,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** uzun basınca önizleme menüsü, ortak ayarlar, web istemcisinin yeni görünümü.
+**Sonraki betalarda:** uzun basınca önizleme menüsü ve ortak ayarlar (beta 18), web istemcisinin yeni görünümü (beta 19, son beta). Ardından 3.0 RC ve 18 Aralık'ta 3.0.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.

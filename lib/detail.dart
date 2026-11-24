@@ -1,5 +1,4 @@
 import 'dart:math' show min;
-import 'dart:ui' show ImageFilter;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -245,8 +244,7 @@ class _DetailScreenState extends State<DetailScreen> {
       );
     }
 
-    final info = <Widget>[
-      Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+    final metaW = Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
         if (x['ProductionYear'] != null) Text('${x['ProductionYear']}', style: const TextStyle(fontSize: 14, color: Color(0xD9F5F5F7))),
         if (age != null) badge(age, fill: true),
         if (isSeries)
@@ -259,10 +257,9 @@ class _DetailScreenState extends State<DetailScreen> {
         for (final c in chips) badge(c),
         if (x['CommunityRating'] != null)
           Text('★ ${(x['CommunityRating'] as num).toStringAsFixed(1)}', style: const TextStyle(fontSize: 13, color: Color(0xD9F5F5F7))),
-      ]),
-      const SizedBox(height: 16),
-      PillButton(res ? 'Devam et' : 'Oynat', icon: Icons.play_arrow_rounded, height: 48, expand: true, onTap: () => openPlayer(context, p)),
-      if (canDl) ...[const SizedBox(height: 10), dlPill()],
+      ]);
+    final playW = PillButton(res ? 'Devam et' : 'Oynat', icon: Icons.play_arrow_rounded, height: 48, expand: true, onTap: () => openPlayer(context, p));
+    final epW = <Widget>[
       if (epOf.isNotEmpty) ...[
         const SizedBox(height: 16),
         Text('$epOf ${p['IndexNumber']}. Bölüm: ${p['Name'] ?? ''}',
@@ -286,6 +283,8 @@ class _DetailScreenState extends State<DetailScreen> {
           Text('${rt(runT - resTicks)} kaldı', style: const TextStyle(fontSize: 12, color: Color(0x99F5F5F7))),
         ]),
       ],
+    ];
+    final textW = <Widget>[
       if (overview.isNotEmpty)
         GestureDetector(
           onTap: () => setState(() => moreText = !moreText),
@@ -297,6 +296,8 @@ class _DetailScreenState extends State<DetailScreen> {
                 style: const TextStyle(fontSize: 15, height: 1.45)),
           ),
         ),
+    ];
+    final peopleW = <Widget>[
       if (actors.isNotEmpty)
         GestureDetector(
           onTap: () => setState(() => tab = 'det'),
@@ -319,9 +320,8 @@ class _DetailScreenState extends State<DetailScreen> {
           child: Text('Yönetmen: ${directors.join(', ')}',
               maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Color(0x8CF5F5F7))),
         ),
-      if (nextEp != null) NextEpisodeRow(nextEp!),
-      const SizedBox(height: 18),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+    ];
+    final actionsW = Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
         _act(fav ? Icons.check_rounded : Icons.add_rounded, 'Listem', () => flag('fav', !fav)),
         _act(seen ? Icons.visibility_rounded : Icons.visibility_outlined, seen ? 'İzlendi' : 'İzlenmedi', () => flag('seen', !seen)),
         if (tr != null) _act(Icons.movie_creation_outlined, 'Fragman', () => launchUrl(Uri.parse(tr), mode: LaunchMode.externalApplication)),
@@ -335,7 +335,18 @@ class _DetailScreenState extends State<DetailScreen> {
             }
             askDownload(context, todo, title: '${todo.length} bölümü indir');
           }),
-      ]),
+      ]);
+    final info = <Widget>[
+      metaW,
+      const SizedBox(height: 16),
+      playW,
+      if (canDl) ...[const SizedBox(height: 10), dlPill()],
+      ...epW,
+      ...textW,
+      ...peopleW,
+      if (nextEp != null) NextEpisodeRow(nextEp!),
+      const SizedBox(height: 18),
+      actionsW,
       const SizedBox(height: 10),
     ];
 
@@ -406,72 +417,94 @@ class _DetailScreenState extends State<DetailScreen> {
           api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
         });
 
-    if (isSplit(context)) {
-      final lw = min(440.0, w * .38);
-      final rw = w - (56 + lw + 40) - 48;
+    // iPad: tam ekran. Üstte boydan boya görsel, altında iki sütun bilgi, sonra sekmeler bütün genişlikte.
+    if (wideLayout(context)) {
+      final h = MediaQuery.sizeOf(context).height;
+      final heroH = min(h * .6, w * .56);
+      const side = 48.0;
       return Scaffold(
         backgroundColor: kBg,
         body: Stack(children: [
-          Positioned.fill(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-              child: netImg(backdrop(x)),
-            ),
-          ),
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0x990B0B0D), Color(0xD90B0B0D), kBg],
-                  stops: [0, .55, 1],
-                ),
-              ),
-            ),
-          ),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(
-              width: 56 + lw + 40,
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(56, top + 64, 40, 40),
-                children: [
-                  Container(
-                    height: lw * 9 / 16,
-                    clipBehavior: Clip.antiAlias,
+          CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: heroH,
+                child: Stack(fit: StackFit.expand, children: [
+                  netImg(backdrop(x, w: 1920), align: const Alignment(.2, -.5)),
+                  const DecoratedBox(
                     decoration: BoxDecoration(
-                      color: kCard,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 60, offset: Offset(0, 24))],
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x800B0B0D), Color(0x000B0B0D), Color(0x000B0B0D), kBg],
+                        stops: [0, .25, .55, 1],
+                      ),
                     ),
-                    child: netImg(backdrop(x), align: const Alignment(.3, -.4)),
                   ),
-                  const SizedBox(height: 18),
-                  titleW(size: 36),
-                  const SizedBox(height: 12),
-                  ...info,
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 48),
-                child: CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
-                  SliverToBoxAdapter(child: SizedBox(height: top + 56)),
-                  SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(bottom: 8), child: tabBar)),
-                  ..._tabBody(context, x, seasons, 0, area: rw),
-                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [Color(0x990B0B0D), Color(0x000B0B0D)],
+                        stops: [0, .6],
+                      ),
+                    ),
+                  ),
+                  if (res && runT > 0)
+                    Align(
+                      alignment: Alignment.bottomLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: (resTicks / runT).clamp(0, 1).toDouble(),
+                        child: Container(height: 3, color: kBlue),
+                      ),
+                    ),
+                  Positioned(left: side, right: side, bottom: 22, child: titleW(size: 44)),
                 ]),
               ),
             ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(side, 6, side, 0),
+              sliver: SliverList.list(children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    flex: 3,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      metaW,
+                      const SizedBox(height: 18),
+                      Row(children: [
+                        Expanded(child: playW),
+                        if (canDl) ...[const SizedBox(width: 12), Expanded(child: dlPill())],
+                      ]),
+                      ...epW,
+                      ...textW,
+                    ]),
+                  ),
+                  const SizedBox(width: 48),
+                  Expanded(
+                    flex: 2,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      ...peopleW,
+                      if (nextEp != null) NextEpisodeRow(nextEp!),
+                      const SizedBox(height: 22),
+                      actionsW,
+                    ]),
+                  ),
+                ]),
+                const SizedBox(height: 28),
+                tabBar,
+                const SizedBox(height: 10),
+              ]),
+            ),
+            ..._tabBody(context, x, seasons, side, area: w),
+            const SliverToBoxAdapter(child: SizedBox(height: 60)),
           ]),
           Positioned(
             top: top + 8,
-            left: 32,
+            left: 28,
             child: GlassIcon(Icons.arrow_back_ios_new_rounded, size: 44, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
           ),
-          if (hasTheme) Positioned(top: top + 8, right: 32, child: themeBtn()),
+          if (hasTheme) Positioned(top: top + 8, right: 28, child: themeBtn()),
         ]),
       );
     }

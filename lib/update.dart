@@ -22,11 +22,14 @@ int compareVersions(String a, String b) {
     return p;
   }
 
+  // alpha < beta < rc < kararlı; aynı etikette sondaki sayı
   int pre(String v) {
     final i = v.indexOf('-');
     if (i < 0) return 1 << 30; // kararlı
-    final m = RegExp(r'(\d+)$').firstMatch(v.substring(i));
-    return m == null ? 0 : int.parse(m.group(1)!);
+    final tail = v.substring(i + 1).toLowerCase();
+    final rank = tail.startsWith('rc') ? 3 : tail.startsWith('beta') ? 2 : tail.startsWith('alpha') ? 1 : 0;
+    final m = RegExp(r'(\d+)$').firstMatch(tail);
+    return rank * 100000 + (m == null ? 0 : int.parse(m.group(1)!));
   }
 
   final x = nums(a), y = nums(b);
