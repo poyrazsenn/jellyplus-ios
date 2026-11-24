@@ -1,0 +1,39 @@
+{
+  "name": "Poyraz Player",
+  "identifier": "com.poyrazsenn.poyraz.source",
+  "subtitle": "Jellyfin için iOS istemcisi",
+  "description": "Poyraz Player'ın SideStore kaynağı. Yeni sürümler (betalar dahil) burada görünür.",
+  "iconURL": "https://raw.githubusercontent.com/poyrazsenn/jellyplus-ios/sidestore/icon.png",
+  "tintColor": "#FFC98F",
+  "website": "https://github.com/poyrazsenn/jellyplus-ios",
+  "apps": [
+    {
+      "name": "Poyraz Player",
+      "bundleIdentifier": "com.jellyplus.jellyplus",
+      "developerName": "Poyraz",
+      "subtitle": "Jellyfin için iOS istemcisi",
+      "localizedDescription": "Kendi Jellyfin sunucundaki film ve dizileri izle, indir, Seerr ile iste.",
+      "iconURL": "https://raw.githubusercontent.com/poyrazsenn/jellyplus-ios/sidestore/icon.png",
+      "tintColor": "#FFC98F",
+      "category": "entertainment",
+      "screenshots": [],
+      "versions": [
+        {
+          "version": "3.0.0",
+          "buildVersion": "45",
+          "marketingVersion": "3.0 beta 16",
+          "date": "2026-11-24T09:28:15Z",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/poyrazsenn/jellyplus-ios/releases/download/v3.0.0-beta.16/JellyPlus.ipa",
+          "size": 16376511,
+          "minOSVersion": "14.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}
