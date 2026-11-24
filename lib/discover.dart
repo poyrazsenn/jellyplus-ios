@@ -272,11 +272,16 @@ class Discover {
     }
     final bid = _boxOf?[id];
     if (bid == null) return null;
-    final kids = await api.items('/Users/${api.uid}/Items?ParentId=$bid&Fields=$kFields,PremiereDate'
-        '&SortBy=PremiereDate,ProductionYear,SortName&SortOrder=Ascending&Limit=200');
-    final films = kids.where((k) => k['Type'] == 'Movie' || k['Type'] == 'Series').toList();
+    final films = await collectionItems(bid);
     if (films.length < 2) return null;
     return (box: _boxes[bid] ?? <String, dynamic>{'Id': bid, 'Name': 'Seri'}, items: films);
+  }
+
+  /// Koleksiyonun içindekiler, çıkış sırasıyla
+  Future<List<J>> collectionItems(String bid) async {
+    final kids = await api.items('/Users/${api.uid}/Items?ParentId=$bid&Fields=$kFields,PremiereDate'
+        '&SortBy=PremiereDate,ProductionYear,SortName&SortOrder=Ascending&Limit=200');
+    return kids.where((k) => k['Type'] == 'Movie' || k['Type'] == 'Series').toList();
   }
 }
 
@@ -713,6 +718,223 @@ class NextEpisodeRow extends StatelessWidget {
                 maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _muted)),
           ]),
         ),
+      ]),
+    );
+  }
+}
+
+// =================== Poster ızgarası (Koleksiyon / Benzerleri) ===================
+class PosterTile extends StatelessWidget {
+  final J x;
+  final int? n;
+  final bool current;
+  const PosterTile(this.x, {super.key, this.n, this.current = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final img = posterUrl(x);
+    final seen = x['UserData']?['Played'] == true;
+    return Semantics(
+      button: true,
+      label: '${n != null ? '$n. ' : ''}${x['Name'] ?? ''}${current ? ', şu an açık' : ''}',
+      child: Pressable(
+        onTap: current ? null : () => openItem(context, x),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: kCard,
+            borderRadius: BorderRadius.circular(10),
+            border: current ? Border.all(color: kBlue, width: 2) : null,
+          ),
+          child: Stack(fit: StackFit.expand, children: [
+            if (img != null)
+              netImg(img)
+            else
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text('${x['Name'] ?? ''}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            if (n != null)
+              Positioned(
+                left: 6,
+                top: 6,
+                child: Container(
+                  height: 22,
+                  constraints: const BoxConstraints(minWidth: 22),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: current ? kBlue : const Color(0xB3000000), borderRadius: BorderRadius.circular(11)),
+                  child: Text('$n', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: current ? kInk : Colors.white)),
+                ),
+              ),
+            if (seen)
+              const Positioned(right: 6, top: 6, child: Icon(Icons.check_circle_rounded, size: 20, color: Colors.white)),
+            if (((x['UserData']?['PlayedPercentage'] as num?) ?? 0) > 0 && !seen)
+              Positioned(
+                left: 6,
+                right: 6,
+                bottom: 6,
+                height: 3,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                      value: (x['UserData']['PlayedPercentage'] as num) / 100, color: kBlue, backgroundColor: const Color(0x40FFFFFF)),
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+int posterCols(double w) => w > 1000 ? 6 : (w > 700 ? 5 : 3);
+
+SliverPadding posterGrid(List<J> list, double pad, double w, {bool numbered = false, String? current}) => SliverPadding(
+      padding: EdgeInsets.symmetric(horizontal: pad),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: posterCols(w), mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 2 / 3),
+        delegate: SliverChildBuilderDelegate(
+          (c, i) => PosterTile(list[i], n: numbered ? i + 1 : null, current: '${list[i]['Id']}' == current),
+          childCount: list.length,
+        ),
+      ),
+    );
+
+// =================== Koleksiyon sayfası ===================
+class CollectionScreen extends StatefulWidget {
+  final String id;
+  const CollectionScreen({super.key, required this.id});
+  @override
+  State<CollectionScreen> createState() => _CollectionScreenState();
+}
+
+class _CollectionScreenState extends State<CollectionScreen> {
+  J? box;
+  List<J>? items;
+  String err = '';
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+    refreshBus.addListener(load);
+  }
+
+  @override
+  void dispose() {
+    refreshBus.removeListener(load);
+    super.dispose();
+  }
+
+  Future<void> load() async {
+    try {
+      final r = await Future.wait<dynamic>([Api.I.item(widget.id), Discover.I.collectionItems(widget.id)]);
+      if (mounted) {
+        setState(() {
+          box = r[0] as J;
+          items = r[1] as List<J>;
+          err = '';
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => err = 'Koleksiyon yüklenemedi.\n$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    final top = MediaQuery.paddingOf(context).top;
+    final pad = hPad(context);
+    final b = box, l = items;
+    Widget back() => Positioned(
+          left: 14,
+          top: top + 8,
+          child: GlassIcon(Icons.arrow_back_ios_new_rounded, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
+        );
+    if (err.isNotEmpty || b == null || l == null) {
+      return Scaffold(
+        backgroundColor: kBg,
+        body: Stack(children: [
+          Positioned.fill(child: err.isNotEmpty ? ErrorView(err, retry: load) : const Loading()),
+          back(),
+        ]),
+      );
+    }
+    bool played(J v) => v['UserData']?['Played'] == true;
+    num pos(J v) => (v['UserData']?['PlaybackPositionTicks'] as num?) ?? 0;
+    final seen = l.where(played).length;
+    final next = l.firstWhere((v) => pos(v) > 0 && !played(v), orElse: () => l.firstWhere((v) => !played(v), orElse: () => l.first));
+    final idx = l.indexOf(next) + 1;
+    final label = pos(next) > 0 && !played(next)
+        ? 'Devam et · $idx. ${next['Name'] ?? ''}'
+        : seen == 0
+            ? 'Sırayla izle'
+            : seen == l.length
+                ? 'Baştan izle'
+                : 'Sıradaki · $idx. ${next['Name'] ?? ''}';
+    final heroH = w > 700 ? w * .42 : w * 9 / 16 + top;
+    return Scaffold(
+      backgroundColor: kBg,
+      body: Stack(children: [
+        CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: heroH,
+              child: Stack(fit: StackFit.expand, children: [
+                netImg(backdrop(b), align: const Alignment(.3, -.4)),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x660B0B0D), Color(0x000B0B0D), kBg],
+                        stops: [0, .45, 1]),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(pad, 0, pad, 0),
+            sliver: SliverList.list(children: [
+              Text('${b['Name'] ?? ''}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -.8, height: 1.1)),
+              const SizedBox(height: 6),
+              Text('Koleksiyon · ${l.length} yapım · ${seen == 0 ? 'hiçbiri izlenmedi' : '$seen\'i izlendi'}',
+                  style: const TextStyle(fontSize: 13, color: Color(0xB8F5F5F7))),
+              if (seen > 0) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                      value: seen / l.length, minHeight: 4, color: kBlue, backgroundColor: Colors.white.withAlpha(38)),
+                ),
+              ],
+              const SizedBox(height: 16),
+              PillButton(label, icon: Icons.play_arrow_rounded, height: 50, expand: true, onTap: () {
+                if (next['Type'] == 'Series') {
+                  openItem(context, next);
+                } else {
+                  openPlayer(context, next, restart: seen == l.length);
+                }
+              }),
+              if ('${b['Overview'] ?? ''}'.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Text('${b['Overview']}', style: const TextStyle(fontSize: 14, height: 1.5, color: Color(0xD9F5F5F7))),
+              ],
+              const SizedBox(height: 22),
+              const Text('Çıkış sırasıyla', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.4)),
+              const SizedBox(height: 12),
+            ]),
+          ),
+          posterGrid(l, pad, w, numbered: true),
+          const SliverToBoxAdapter(child: SizedBox(height: 60)),
+        ]),
+        back(),
       ]),
     );
   }

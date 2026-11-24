@@ -292,6 +292,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: 'Bu sürümdeki yenilikler',
             onTap: () => showWhatsNew(context, force: true),
           ),
+          _Row(
+            lead: _tile(Icons.system_update_rounded, const Color(0xFF0A84FF)),
+            label: 'Güncellemeleri denetle',
+            onTap: () => checkUpdate(context, manual: true),
+          ),
         ]),
 
         const SizedBox(height: 28),

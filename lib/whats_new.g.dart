@@ -3,6 +3,7 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['layout', 'iPad düzeni', 'iPad\'de alt bar yerine üstte cam sekme kapsülü; solda logo, sağda profil. Aynı uygulama, ekran genişliğine göre kendiliğinden geçiyor.'],
-  ['next', 'İki sütunlu detay', 'Yatay iPad\'de detay sayfası ikiye bölünüyor; solda görsel, bilgiler ve oynat, sağda bölümler ve sekmeler.'],
+  ['library', 'Yeni dizi ve film sayfası', 'Üstte görsel, altında başlık, bilgi satırı, Devam et ve İndir düğmeleri, kalan süre, oyuncular ve simgeli eylemler. Sekmeler artık yazı halinde: Bölümler, Koleksiyon, Benzerleri, Detaylar.'],
+  ['library', 'Koleksiyon sekmesi ve sayfası', 'Seriye ait yapımların sayfasında Koleksiyon sekmesi; afişler çıkış sırasıyla numaralı. Koleksiyona girince kendi sayfası açılıyor: kaçını izlediğin ve "Sırayla izle" düğmesi.'],
+  ['update', 'Güncelleme bildirimi', 'Yeni sürüm çıkınca uygulama haber veriyor, "İndir"e basınca IPA doğrudan iniyor. Profil → Güncellemeleri denetle ile elle de bakabilirsin.'],
 ];

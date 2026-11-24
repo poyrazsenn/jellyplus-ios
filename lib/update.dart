@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
@@ -55,45 +56,90 @@ Future<void> showWhatsNew(BuildContext context, {bool force = false}) async {
   await showSmallWhatsNew(context);
 }
 
-/// Sunucudaki web klasörüne konan jellyplus-version.json'a bakar:
-/// {"ios": "2.0.0", "notes": "…", "url": "https://…"}
-Future<void> checkUpdate(BuildContext context) async {
+const kRepo = 'poyrazsenn/jellyplus-ios';
+
+/// "v3.0.0-beta.16" → "3.0 beta 16"
+String prettyVersion(String v) {
+  final t = v.replaceFirst(RegExp(r'^v'), '');
+  final core = t.split('-').first.split('.');
+  final short = core.length >= 3 && core[2] == '0' ? '${core[0]}.${core[1]}' : core.join('.');
+  final pre = t.contains('-') ? t.substring(t.indexOf('-') + 1).replaceAll('.', ' ') : '';
+  return pre.isEmpty ? short : '$short $pre';
+}
+
+/// Uygulama açılınca (6 saatte bir) ve Profil → Güncellemeleri denetle'den:
+/// GitHub'daki sürümlere bakar. Beta kullanıyorsan betaları da gösterir.
+Future<void> checkUpdate(BuildContext context, {bool manual = false}) async {
   final api = Api.I;
-  J j;
+  final p = api.prefs;
+  final now = DateTime.now().millisecondsSinceEpoch;
+  if (!manual && now - (p.getInt('updAt') ?? 0) < 6 * 3600 * 1000) return;
+  String? tag, ipa, body;
   try {
-    j = J.from(jsonDecode(await api.getText('${api.url}/web/jellyplus-version.json')) as Map);
+    final r = await http.get(Uri.parse('https://api.github.com/repos/$kRepo/releases?per_page=20'),
+        headers: {'Accept': 'application/vnd.github+json'}).timeout(const Duration(seconds: 15));
+    if (r.statusCode != 200) throw Exception('GitHub ${r.statusCode}');
+    final beta = kVersion.contains('-');
+    for (final x in (jsonDecode(utf8.decode(r.bodyBytes)) as List).cast<Map>()) {
+      if (x['draft'] == true || (!beta && x['prerelease'] == true)) continue;
+      final t = '${x['tag_name'] ?? ''}';
+      if (t.isEmpty) continue;
+      if (tag == null || compareVersions(t, tag) > 0) {
+        tag = t;
+        body = '${x['body'] ?? ''}';
+        ipa = ((x['assets'] as List?) ?? const [])
+            .cast<Map>()
+            .map((a) => '${a['browser_download_url'] ?? ''}')
+            .firstWhere((u) => u.endsWith('.ipa'), orElse: () => '${x['html_url'] ?? ''}');
+      }
+    }
+    await p.setInt('updAt', now);
   } catch (_) {
-    return; // dosya yok ya da çevrimdışı: sessiz geç
+    if (manual && context.mounted) {
+      await _say(context, 'Denetlenemedi', 'GitHub\'a ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.');
+    }
+    return;
   }
-  final latest = '${j['ios'] ?? ''}';
-  if (latest.isEmpty || compareVersions(latest, kVersion) <= 0) return;
-  if (api.prefs.getString('skipver') == latest) return;
   if (!context.mounted) return;
-  final url = '${j['url'] ?? ''}';
+  if (tag == null || compareVersions(tag, kVersion) <= 0) {
+    if (manual) await _say(context, 'Güncelsin', 'Poyraz Player ${prettyVersion(kVersion)} en yeni sürüm.');
+    return;
+  }
+  if (!manual && p.getString('skipver') == tag) return;
+  final news = RegExp(r'^- \*\*(.+?):?\*\*', multiLine: true)
+      .allMatches(body ?? '')
+      .map((m) => m.group(1)!.replaceAll(RegExp(r':$'), ''))
+      .take(4)
+      .toList();
+  final t = tag;
+  final dl = ipa ?? '';
   await showCupertinoDialog(
     context: context,
     builder: (c) => CupertinoAlertDialog(
-      title: const Text('Yeni sürüm var'),
-      content: Text(
-        'Poyraz Player $latest çıktı (sende $kVersion).'
-        '${'${j['notes'] ?? ''}'.isNotEmpty ? '\n\n${j['notes']}' : ''}'
-        '\n\nYeni IPA\'yı Sideloadly ile aynı şekilde kur; girişlerin ve indirdiklerin silinmez.',
+      title: Text('Poyraz Player ${prettyVersion(t)} hazır'),
+      content: Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          'Sende ${prettyVersion(kVersion)} var.'
+          '${news.isNotEmpty ? '\n\nYenilikler:\n${news.map((n) => '• $n').join('\n')}' : ''}'
+          '\n\n"İndir"e basınca IPA telefonuna iner. Sonra Sideloadly ile her zamanki gibi kur; girişlerin ve indirdiklerin silinmez.',
+          textAlign: TextAlign.left,
+        ),
       ),
       actions: [
-        if (url.isNotEmpty)
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () {
-              Navigator.pop(c);
-              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-            },
-            child: const Text('İndir'),
-          ),
+        CupertinoDialogAction(
+          isDefaultAction: true,
+          onPressed: () {
+            Navigator.pop(c);
+            if (dl.isNotEmpty) launchUrl(Uri.parse(dl), mode: LaunchMode.externalApplication);
+          },
+          child: const Text('İndir'),
+        ),
         CupertinoDialogAction(onPressed: () => Navigator.pop(c), child: const Text('Sonra')),
         CupertinoDialogAction(
           isDestructiveAction: true,
           onPressed: () {
-            api.prefs.setString('skipver', latest);
+            p.setString('skipver', t);
             Navigator.pop(c);
           },
           child: const Text('Bu sürümü atla'),
@@ -102,3 +148,12 @@ Future<void> checkUpdate(BuildContext context) async {
     ),
   );
 }
+
+Future<void> _say(BuildContext context, String title, String msg) => showCupertinoDialog(
+      context: context,
+      builder: (c) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Text(msg),
+        actions: [CupertinoDialogAction(isDefaultAction: true, onPressed: () => Navigator.pop(c), child: const Text('Tamam'))],
+      ),
+    );

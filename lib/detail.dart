@@ -102,7 +102,7 @@ class _DetailScreenState extends State<DetailScreen> {
           if (mounted && n != null) setState(() => nextEp = n);
         }).catchError((_) {});
       }
-      if (x['Type'] == 'Movie' && order == null) {
+      if ((x['Type'] == 'Movie' || x['Type'] == 'Series') && order == null) {
         Discover.I.seriesOrder(id).then((o) {
           if (mounted && o != null) setState(() => order = o);
         }).catchError((_) {});
@@ -174,125 +174,239 @@ class _DetailScreenState extends State<DetailScreen> {
       if (sts.cast<Map>().any((s) => s['Type'] == 'Subtitle')) 'CC',
       if (ch >= 8) '7.1' else if (ch >= 6) '5.1',
     ];
-    final meta = [
-      if (x['ProductionYear'] != null) '${x['ProductionYear']}',
-      if (isSeries)
-        (() {
-          final n = eps.map((e) => e['ParentIndexNumber']).toSet().length;
-          return n > 0 ? '$n sezon' : '';
-        })()
-      else
-        rt(x['RunTimeTicks']),
-      if (x['CommunityRating'] != null) '★ ${(x['CommunityRating'] as num).toStringAsFixed(1)}',
-    ].where((s) => s.isNotEmpty).join(' · ');
-    final genres = ((x['Genres'] as List?) ?? const []).take(4).join(', ');
     final seasons = eps.map((e) => e['ParentIndexNumber'] as num?).toSet().toList();
     final tabs = [
       if (eps.isNotEmpty) ['eps', 'Bölümler'],
-      ['sim', isSeries ? 'Benzer' : 'Önerilenler'],
+      if (order != null) ['col', 'Koleksiyon'],
+      ['sim', 'Benzerleri'],
       if (extras.isNotEmpty) ['ext', 'Ekstralar'],
       ['det', 'Detaylar'],
     ];
+    if (!tabs.any((t) => t[0] == tab)) tab = tabs.first[0];
     final fav = x['UserData']?['IsFavorite'] == true;
     final seen = x['UserData']?['Played'] == true;
-    final heroH = w > 700 ? w * .5 : w * 1.02;
+    final top = MediaQuery.paddingOf(context).top;
+    final epOf = isSeries && p['IndexNumber'] != null ? 'S${p['ParentIndexNumber']}:B${p['IndexNumber']}' : '';
+    final runT = ((p['RunTimeTicks'] as num?) ?? 0);
+    final people = ((x['People'] as List?) ?? const []).cast<Map>();
+    final actors = people.where((q) => q['Type'] == 'Actor').take(3).map((q) => '${q['Name']}').toList();
+    final directors = people.where((q) => q['Type'] == 'Director').take(2).map((q) => '${q['Name']}').toList();
+    final overview = isSeries && '${p['Overview'] ?? ''}'.isNotEmpty && p != x ? '${p['Overview']}' : '${x['Overview'] ?? ''}';
+    final canDl = isSeries ? p != x && p['Type'] == 'Episode' : (x['MediaSources'] as List?)?.isNotEmpty == true;
+    final age = ageLabel(x['OfficialRating']);
 
-    String playLabel() {
-      if (!res) return isSeries && p['IndexNumber'] != null ? 'Oynat · S${p['ParentIndexNumber']} B${p['IndexNumber']}' : 'Oynat';
-      final left = ((p['RunTimeTicks'] as num?) ?? 0) - resTicks;
-      final ep = isSeries && p['IndexNumber'] != null ? ' · S${p['ParentIndexNumber']} B${p['IndexNumber']}' : '';
-      return 'Devam et$ep${left > 0 ? ' · ${rt(left)} kaldı' : ''}';
+    Widget badge(String t, {bool fill = false}) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          decoration: BoxDecoration(
+            color: fill ? Colors.white.withAlpha(46) : null,
+            border: fill ? null : Border.all(color: const Color(0x80F5F5F7), width: 1),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xE6F5F5F7))),
+        );
+
+    Widget dlPill() {
+      final b = dlButton('${p['Id']}');
+      final d = Downloads.I.of('${p['Id']}');
+      final done = d?.state == DlState.done;
+      final what = epOf.isNotEmpty ? ' $epOf' : '';
+      final text = b.frac != null
+          ? 'İndiriliyor$what${b.frac! > 0 ? ' · %${(b.frac! * 100).round()}' : ''}'
+          : done
+              ? 'İndirildi$what'
+              : 'İndir$what';
+      return Semantics(
+        button: true,
+        label: text,
+        child: Pressable(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            d == null ? askDownload(context, [p]) : dlActions(context, d);
+          },
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(color: Colors.white.withAlpha(36), borderRadius: BorderRadius.circular(24)),
+            child: Stack(children: [
+              if (b.frac != null && b.frac! > 0)
+                FractionallySizedBox(
+                  widthFactor: b.frac!,
+                  child: Container(decoration: BoxDecoration(color: Colors.white.withAlpha(40), borderRadius: BorderRadius.circular(24))),
+                ),
+              Center(
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(done ? Icons.check_rounded : Icons.download_rounded, size: 22, color: const Color(0xFFF5F5F7)),
+                  const SizedBox(width: 8),
+                  Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
     }
 
     final info = <Widget>[
-
-            Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              Text(meta, style: const TextStyle(color: Color(0xB8F5F5F7), fontSize: 13)),
-              for (final c in [if (ageLabel(x['OfficialRating']) != null) ageLabel(x['OfficialRating'])!, ...chips])
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0x80F5F5F7), width: 1), borderRadius: BorderRadius.circular(4)),
-                  child: Text(c, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xB8F5F5F7))),
-                ),
-            ]),
-            if (genres.isNotEmpty)
-              Padding(padding: const EdgeInsets.only(top: 6), child: Text(genres, style: const TextStyle(fontSize: 13))),
-            const SizedBox(height: 16),
-            PillButton(playLabel(),
-                icon: Icons.play_arrow_rounded, height: 52, expand: true, onTap: () => openPlayer(context, p)),
-            if (res && ((p['RunTimeTicks'] as num?) ?? 0) > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(2),
-                  child: LinearProgressIndicator(
-                    value: (resTicks / (p['RunTimeTicks'] as num)).clamp(0, 1).toDouble(),
-                    minHeight: 3,
-                    backgroundColor: Colors.white24,
-                    color: Colors.white,
-                  ),
-                ),
+      Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        if (x['ProductionYear'] != null) Text('${x['ProductionYear']}', style: const TextStyle(fontSize: 14, color: Color(0xD9F5F5F7))),
+        if (age != null) badge(age, fill: true),
+        if (isSeries)
+          (() {
+            final n = eps.map((e) => e['ParentIndexNumber']).where((v) => v != 0 && v != null).toSet().length;
+            return n > 0 ? Text('$n Sezon', style: const TextStyle(fontSize: 14, color: Color(0xD9F5F5F7))) : const SizedBox.shrink();
+          })()
+        else if (rt(x['RunTimeTicks']).isNotEmpty)
+          Text(rt(x['RunTimeTicks']), style: const TextStyle(fontSize: 14, color: Color(0xD9F5F5F7))),
+        for (final c in chips) badge(c),
+        if (x['CommunityRating'] != null)
+          Text('★ ${(x['CommunityRating'] as num).toStringAsFixed(1)}', style: const TextStyle(fontSize: 13, color: Color(0xD9F5F5F7))),
+      ]),
+      const SizedBox(height: 16),
+      PillButton(res ? 'Devam et' : 'Oynat', icon: Icons.play_arrow_rounded, height: 48, expand: true, onTap: () => openPlayer(context, p)),
+      if (canDl) ...[const SizedBox(height: 10), dlPill()],
+      if (epOf.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Text('$epOf ${p['IndexNumber']}. Bölüm: ${p['Name'] ?? ''}',
+            maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+      ],
+      if (res && runT > 0) ...[
+        SizedBox(height: epOf.isNotEmpty ? 8 : 14),
+        Row(children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: (resTicks / runT).clamp(0, 1).toDouble(),
+                minHeight: 4,
+                backgroundColor: Colors.white.withAlpha(51),
+                color: kBlue,
               ),
-            const SizedBox(height: 12),
-            Row(children: [
-              _act(fav ? Icons.check : Icons.add, 'Listem', () => flag('fav', !fav)),
-              if (tr != null)
-                _act(Icons.movie_creation_outlined, 'Fragman',
-                    () => launchUrl(Uri.parse(tr), mode: LaunchMode.externalApplication)),
-              if (res) _act(Icons.replay, 'Baştan', () => openPlayer(context, p, restart: true)),
-              if (!isSeries && (x['MediaSources'] as List?)?.isNotEmpty == true) _dlAct(x),
-              _act(seen ? Icons.visibility : Icons.visibility_outlined, seen ? 'İzlendi' : 'İzlenmedi',
-                  () => flag('seen', !seen)),
-            ]),
-            if (nextEp != null) NextEpisodeRow(nextEp!),
-            if ('${x['Overview'] ?? ''}'.isNotEmpty)
-              GestureDetector(
-                onTap: () => setState(() => moreText = !moreText),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 14),
-                  child: Text('${x['Overview']}',
-                      maxLines: moreText ? null : 4,
-                      overflow: moreText ? null : TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14, height: 1.5)),
-                ),
-              ),
-            const SizedBox(height: 14),
-    ];
-    final tabBar = // sekmeler: iOS bölümlü seçici
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(12)),
-              child: Row(children: [
-                for (final t in tabs)
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => tab = t[0]);
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        height: 34,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: tab == t[0] ? Colors.white.withAlpha(46) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Text(t[1],
-                            maxLines: 1,
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: tab == t[0] ? FontWeight.w600 : FontWeight.w500,
-                                color: tab == t[0] ? Colors.white : const Color(0xA6F5F5F7))),
-                      ),
-                    ),
-                  ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text('${rt(runT - resTicks)} kaldı', style: const TextStyle(fontSize: 12, color: Color(0x99F5F5F7))),
+        ]),
+      ],
+      if (overview.isNotEmpty)
+        GestureDetector(
+          onTap: () => setState(() => moreText = !moreText),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Text(overview,
+                maxLines: moreText ? null : 4,
+                overflow: moreText ? null : TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15, height: 1.45)),
+          ),
+        ),
+      if (actors.isNotEmpty)
+        GestureDetector(
+          onTap: () => setState(() => tab = 'det'),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(text: 'Oyuncular: ${actors.join(', ')}'),
+                const TextSpan(text: ' … daha fazla', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xCCF5F5F7))),
               ]),
-            );
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, color: Color(0x8CF5F5F7)),
+            ),
+          ),
+        ),
+      if (directors.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text('Yönetmen: ${directors.join(', ')}',
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Color(0x8CF5F5F7))),
+        ),
+      if (nextEp != null) NextEpisodeRow(nextEp!),
+      const SizedBox(height: 18),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+        _act(fav ? Icons.check_rounded : Icons.add_rounded, 'Listem', () => flag('fav', !fav)),
+        _act(seen ? Icons.visibility_rounded : Icons.visibility_outlined, seen ? 'İzlendi' : 'İzlenmedi', () => flag('seen', !seen)),
+        if (tr != null) _act(Icons.movie_creation_outlined, 'Fragman', () => launchUrl(Uri.parse(tr), mode: LaunchMode.externalApplication)),
+        if (res) _act(Icons.replay_rounded, 'Baştan', () => openPlayer(context, p, restart: true)),
+        if (isSeries && season != null)
+          _act(Icons.download_for_offline_outlined, season == 0 ? 'Özeller' : 'Sezon $season', () {
+            final todo = eps.where((e) => e['ParentIndexNumber'] == season && Downloads.I.of('${e['Id']}') == null).toList();
+            if (todo.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bu sezonun bölümleri zaten indirildi ya da sırada.')));
+              return;
+            }
+            askDownload(context, todo, title: '${todo.length} bölümü indir');
+          }),
+      ]),
+      const SizedBox(height: 10),
+    ];
+
+    // Sekmeler: altı çizili yazılar, seçilinin üstünde ince çizgi
+    final tabBar = SizedBox(
+      height: 50,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          for (final t in tabs)
+            Semantics(
+              button: true,
+              selected: tab == t[0],
+              label: t[1],
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => tab = t[0]);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 24),
+                  child: IntrinsicWidth(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: tab == t[0] ? kBlue : Colors.transparent,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(t[1],
+                          style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: tab == t[0] ? const Color(0xFFF5F5F7) : const Color(0x73F5F5F7))),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    Widget titleW({double size = 30}) => lg != null
+        ? Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              height: size * 2,
+              width: w > 700 ? 360 : w * .7,
+              child: CachedNetworkImage(
+                  imageUrl: lg,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.centerLeft,
+                  errorWidget: (_, __, ___) => Text('${x['Name'] ?? ''}',
+                      style: TextStyle(fontSize: size, fontWeight: FontWeight.w800, letterSpacing: -.8))),
+            ),
+          )
+        : Text('${x['Name'] ?? ''}', style: TextStyle(fontSize: size, fontWeight: FontWeight.w800, letterSpacing: -.8, height: 1.1));
+
+    Widget themeBtn() => GlassIcon(api.themeOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+            size: 36, tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç', onTap: () {
+          setState(() => api.themeOn = !api.themeOn);
+          api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
+        });
 
     if (isSplit(context)) {
-      final top = MediaQuery.paddingOf(context).top;
       final lw = min(440.0, w * .38);
       final rw = w - (56 + lw + 40) - 48;
       return Scaffold(
@@ -331,31 +445,11 @@ class _DetailScreenState extends State<DetailScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 60, offset: Offset(0, 24))],
                     ),
-                    child: Stack(fit: StackFit.expand, children: [
-                      netImg(backdrop(x), align: const Alignment(.3, -.4)),
-                      if (lg != null) ...[
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.center,
-                                colors: [Color(0x99000000), Color(0x00000000)]),
-                          ),
-                        ),
-                        Positioned(
-                          left: 18,
-                          bottom: 16,
-                          width: lw * .55,
-                          height: lw * .16,
-                          child: CachedNetworkImage(imageUrl: lg, fit: BoxFit.contain, alignment: Alignment.bottomLeft),
-                        ),
-                      ],
-                    ]),
+                    child: netImg(backdrop(x), align: const Alignment(.3, -.4)),
                   ),
                   const SizedBox(height: 18),
-                  Text('${x['Name'] ?? ''}',
-                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -1.4, height: 1.05)),
-                  const SizedBox(height: 10),
+                  titleW(size: 36),
+                  const SizedBox(height: 12),
                   ...info,
                 ],
               ),
@@ -364,14 +458,8 @@ class _DetailScreenState extends State<DetailScreen> {
               child: Padding(
                 padding: const EdgeInsets.only(right: 48),
                 child: CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
-                  SliverToBoxAdapter(child: SizedBox(height: top + 64)),
-                  if (order != null)
-                    SliverToBoxAdapter(
-                        child: MediaQuery.removePadding(
-                            context: context,
-                            removeLeft: true,
-                            child: SeriesOrderShelf(box: order!.box, items: order!.items, current: '${x['Id']}'))),
-                  SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(bottom: 14), child: tabBar)),
+                  SliverToBoxAdapter(child: SizedBox(height: top + 56)),
+                  SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(bottom: 8), child: tabBar)),
                   ..._tabBody(context, x, seasons, 0, area: rw),
                   const SliverToBoxAdapter(child: SizedBox(height: 40)),
                 ]),
@@ -383,81 +471,62 @@ class _DetailScreenState extends State<DetailScreen> {
             left: 32,
             child: GlassIcon(Icons.arrow_back_ios_new_rounded, size: 44, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
           ),
-          if (hasTheme)
-            Positioned(
-              top: top + 8,
-              right: 32,
-              child: GlassIcon(api.themeOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                  tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç', onTap: () {
-                setState(() => api.themeOn = !api.themeOn);
-                api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
-              }),
-            ),
+          if (hasTheme) Positioned(top: top + 8, right: 32, child: themeBtn()),
         ]),
       );
     }
 
+    final imgH = w > 700 ? w * .5 : w * 9 / 16;
     return Scaffold(
-      body: CustomScrollView(slivers: [
+      backgroundColor: kBg,
+      body: CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
         SliverToBoxAdapter(
           child: SizedBox(
-            height: heroH,
-            child: Stack(fit: StackFit.expand, children: [
-              netImg(backdrop(x), align: const Alignment(.3, -.4)),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0x660B0B0D), Color(0x000B0B0D), Color(0xCC0B0B0D), kBg],
-                      stops: [0, .3, .78, 1]),
-                ),
+            height: top + imgH,
+            child: Stack(children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                top: top,
+                height: imgH,
+                child: Stack(fit: StackFit.expand, children: [
+                  netImg(backdrop(x), align: const Alignment(.3, -.4)),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x00000000), Color(0x00000000), Color(0x990B0B0D)],
+                          stops: [0, .7, 1]),
+                    ),
+                  ),
+                  if (res && runT > 0)
+                    Align(
+                      alignment: Alignment.bottomLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: (resTicks / runT).clamp(0, 1).toDouble(),
+                        child: Container(height: 3, color: kBlue),
+                      ),
+                    ),
+                ]),
               ),
               Positioned(
-                top: MediaQuery.paddingOf(context).top + 8,
+                top: top + 10,
                 left: 14,
-                child: GlassIcon(Icons.arrow_back_ios_new_rounded,
-                    tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
+                child: GlassIcon(Icons.arrow_back_ios_new_rounded, tooltip: 'Geri', onTap: () => Navigator.of(context).maybePop()),
               ),
-              if (hasTheme)
-                Positioned(
-                  top: MediaQuery.paddingOf(context).top + 8,
-                  right: 14,
-                  child: GlassIcon(api.themeOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                      tooltip: api.themeOn ? 'Tema müziğini kapat' : 'Tema müziğini aç', onTap: () {
-                    setState(() => api.themeOn = !api.themeOn);
-                    api.themeOn ? ThemeMusic.I.start(widget.id) : ThemeMusic.I.stop(ifOwner: widget.id);
-                  }),
-                ),
-              Positioned(
-                left: pad,
-                right: pad,
-                bottom: 4,
-                height: heroH * .3,
-                child: lg != null
-                    ? CachedNetworkImage(
-                        imageUrl: lg,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.bottomLeft,
-                        errorWidget: (_, __, ___) => _title(x))
-                    : _title(x),
-              ),
+              if (hasTheme) Positioned(right: 12, top: top + imgH - 48, child: themeBtn()),
             ]),
           ),
         ),
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
+          padding: EdgeInsets.fromLTRB(pad, 14, pad, 0),
           sliver: SliverList.list(children: [
+            titleW(),
+            const SizedBox(height: 10),
             ...info,
-          ]),
-        ),
-        if (order != null)
-          SliverToBoxAdapter(child: SeriesOrderShelf(box: order!.box, items: order!.items, current: '${x['Id']}')),
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: pad),
-          sliver: SliverList.list(children: [
             tabBar,
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
           ]),
         ),
         ..._tabBody(context, x, seasons, pad),
@@ -466,55 +535,26 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _title(J x) => Align(
-        alignment: Alignment.bottomLeft,
-        child: Text('${x['Name'] ?? ''}',
-            maxLines: 2,
-            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, shadows: [Shadow(blurRadius: 14)])),
-      );
-
-  Widget _dlAct(J v) {
-    final b = dlButton('${v['Id']}');
-    final d = Downloads.I.of('${v['Id']}');
-    return _act(b.icon, b.label, () => d == null ? askDownload(context, [v]) : dlActions(context, d), frac: b.frac);
-  }
-
-  /// A · Cam: cam kare eylem kutusu (Listem, İndir, Fragman…)
-  Widget _act(IconData i, String label, VoidCallback onTap, {double? frac}) => Expanded(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Semantics(
-            button: true,
-            label: label,
-            child: Pressable(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                onTap();
-              },
-              child: Container(
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(20),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withAlpha(26)),
-                ),
-                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Stack(alignment: Alignment.center, children: [
-                      Icon(i, size: frac != null ? 14 : 21),
-                      if (frac != null)
-                        SizedBox.expand(
-                            child: CircularProgressIndicator(
-                                value: frac == 0 ? null : frac, strokeWidth: 2, color: Colors.white)),
-                    ]),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
-                ]),
-              ),
-            ),
+  /// Simge + altında yazı (Listem, İzlendi, Fragman, Sezonu indir…)
+  Widget _act(IconData i, String label, VoidCallback onTap) => Semantics(
+        button: true,
+        label: label,
+        child: Pressable(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: SizedBox(
+            width: 78,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(i, size: 28, color: const Color(0xFFF5F5F7)),
+              const SizedBox(height: 6),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ]),
           ),
         ),
       );
@@ -620,7 +660,29 @@ class _DetailScreenState extends State<DetailScreen> {
       case 'sim':
         return similar.isEmpty
             ? [const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(20), child: Text('Öneri yok.', style: TextStyle(color: kMuted))))]
-            : [grid(similar)];
+            : [SliverToBoxAdapter(child: SizedBox(height: 6)), posterGrid(similar, pad, w)];
+      case 'col':
+        final o = order;
+        if (o == null) return [];
+        return [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(pad, 4, pad, 12),
+              child: Pressable(
+                onTap: () => openItem(context, o.box),
+                child: Row(children: [
+                  Expanded(
+                    child: Text('${o.box['Name'] ?? ''} · ${o.items.length} yapım · çıkış sırasıyla',
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Color(0x99F5F5F7))),
+                  ),
+                  const Text('Tümü', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Icon(Icons.chevron_right_rounded, size: 20),
+                ]),
+              ),
+            ),
+          ),
+          posterGrid(o.items, pad, w, numbered: true, current: '${x['Id']}'),
+        ];
       case 'ext':
         return [grid(extras, play: true)];
       default:

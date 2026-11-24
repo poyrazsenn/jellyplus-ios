@@ -1,5 +1,11 @@
-## Poyraz Player 3.0 — beta 15
+## Poyraz Player 3.0 — beta 16
 **Yenilikler**
+
+- **Yeni dizi ve film sayfası:** Üstte görsel, altında başlık, bilgi satırı, Devam et ve İndir düğmeleri, kalan süre, oyuncular ve simgeli eylemler. Sekmeler artık yazı halinde: Bölümler, Koleksiyon, Benzerleri, Detaylar.
+- **Koleksiyon sekmesi ve sayfası:** Seriye ait yapımların sayfasında Koleksiyon sekmesi; afişler çıkış sırasıyla numaralı. Koleksiyona girince kendi sayfası açılıyor: kaçını izlediğin ve "Sırayla izle" düğmesi.
+- **Güncelleme bildirimi:** Yeni sürüm çıkınca uygulama haber veriyor, "İndir"e basınca IPA doğrudan iniyor. Profil → Güncellemeleri denetle ile elle de bakabilirsin.
+
+**Beta 15'te gelenler**
 
 - **iPad düzeni:** iPad'de alt bar yerine üstte cam sekme kapsülü; solda logo, sağda profil. Aynı uygulama, ekran genişliğine göre kendiliğinden geçiyor.
 - **İki sütunlu detay:** Yatay iPad'de detay sayfası ikiye bölünüyor; solda görsel, bilgiler ve oynat, sağda bölümler ve sekmeler.
