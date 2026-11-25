@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -28,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<List<J>> lat = [];
   List<J> top = [], soon = [];
   final scrollY = ValueNotifier<double>(0);
+  bool slow = false;
+  Timer? _slowT;
   List<_Studio> studios = [];
 
   @override
@@ -41,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     refreshBus.removeListener(_silent);
     scrollY.dispose();
+    _slowT?.cancel();
     super.dispose();
   }
 
@@ -62,7 +67,14 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
     final u = api.uid;
+    _slowT?.cancel();
+    if (!silent) {
+      _slowT = Timer(const Duration(seconds: 10), () {
+        if (mounted && loading) setState(() => slow = true);
+      });
+    }
     try {
+      // 1) Önce ekranı dolduranlar: vitrin, devam et, kütüphaneler, Listem
       final r = await Future.wait<List<J>>([
         safe(api.items('/Users/$u/Items/Resume?Limit=12&MediaTypes=Video&Fields=$kFields')),
         api.items('/Users/$u/Views'),
@@ -70,25 +82,59 @@ class _HomeScreenState extends State<HomeScreen> {
         silent && feat.isNotEmpty
             ? Future.value(feat)
             : safe(api.items('/Users/$u/Items?IncludeItemTypes=Movie,Series&Recursive=true&SortBy=Random&Limit=24&ImageTypes=Backdrop&Fields=$kFields')),
-        safe(api.items('/Users/$u/Items?IncludeItemTypes=BoxSet&Recursive=true&SortBy=SortName&Limit=30&Fields=$kFields')),
-        safe(api.items('/Users/$u/Items?IncludeItemTypes=Movie,Series&Recursive=true&SortBy=DateCreated&SortOrder=Descending&Limit=300&Fields=Studios')),
-        safe(api.items('/Studios?userId=$u&Recursive=true&EnableImages=true&EnableImageTypes=Primary,Thumb&Limit=2000')),
       ]);
       final views = r[1]
           .where((v) => !['music', 'books', 'photos', 'playlists', 'livetv', 'boxsets', 'musicvideos'].contains(v['CollectionType']))
           .toList();
-      final latest = await Future.wait(views.map((v) => safe(api.items('/Users/$u/Items/Latest?ParentId=${v['Id']}&Limit=16&Fields=$kFields'))));
+      if (!mounted) return;
+      _slowT?.cancel();
+      setState(() {
+        res = r[0];
+        libs = views;
+        fav = r[2];
+        feat = r[3].where((x) => ((x['BackdropImageTags'] as List?) ?? const []).isNotEmpty).take(6).toList();
+        loading = false;
+        slow = false;
+      });
+      _discover();
+      _rest(views);
+    } catch (e) {
+      _slowT?.cancel();
+      if (!mounted) return;
+      if (silent && libs.isNotEmpty) return; // sessiz yenileme başarısız: eldekini göstermeye devam
+      setState(() {
+        loading = false;
+        slow = false;
+        err = 'Ana sayfa yüklenemedi.\n$e';
+      });
+    }
+  }
 
-      // stüdyolar: kütüphanede en çok içeriği olanlar
-      final m = <String, _Studio>{};
-      for (final x in r[5]) {
-        for (final s in (x['Studios'] as List? ?? const [])) {
-          final id = '${s['Id']}';
-          (m[id] ??= _Studio(id, '${s['Name']}')).n++;
-        }
+  /// 2) Sonra yavaş olabilenler: yeni eklenenler, koleksiyonlar, stüdyolar. Ana sayfayı bekletmez.
+  Future<void> _rest(List<J> views) async {
+    final u = api.uid;
+    final latF = Future.wait(views.map((v) => safe(api.items('/Users/$u/Items/Latest?ParentId=${v['Id']}&Limit=16&Fields=$kFields'))));
+    final colsF = safe(api.items('/Users/$u/Items?IncludeItemTypes=BoxSet&Recursive=true&SortBy=SortName&Limit=30&Fields=$kFields'));
+    final stF = safe(api.items('/Users/$u/Items?IncludeItemTypes=Movie,Series&Recursive=true&SortBy=DateCreated&SortOrder=Descending&Limit=300&Fields=Studios'));
+    final latest = await latF;
+    if (!mounted) return;
+    setState(() => lat = latest);
+    final c = await colsF;
+    if (!mounted) return;
+    setState(() => cols = c);
+    final recent = await stF;
+    // stüdyolar: kütüphanede en çok içeriği olanlar; görselleri sadece bu 10 stüdyo için istenir
+    final m = <String, _Studio>{};
+    for (final x in recent) {
+      for (final s in (x['Studios'] as List? ?? const [])) {
+        final id = '${s['Id']}';
+        (m[id] ??= _Studio(id, '${s['Name']}')).n++;
       }
-      final tags = {for (final s in r[6]) '${s['Id']}': (s['ImageTags'] as Map?) ?? const {}};
-      final st = m.values.where((s) => s.n >= 2).toList()..sort((a, b) => b.n.compareTo(a.n));
+    }
+    final st = (m.values.where((s) => s.n >= 2).toList()..sort((a, b) => b.n.compareTo(a.n))).take(10).toList();
+    if (st.isNotEmpty) {
+      final imgs = await safe(api.items('/Users/$u/Items?Ids=${st.map((s) => s.id).join(',')}&EnableImageTypes=Primary,Thumb'));
+      final tags = {for (final s in imgs) '${s['Id']}': (s['ImageTags'] as Map?) ?? const {}};
       for (final s in st) {
         final t = tags[s.id];
         if (t == null) continue;
@@ -98,26 +144,8 @@ class _HomeScreenState extends State<HomeScreen> {
           s.img = api.image(s.id, 'Thumb', tag: t['Thumb'], w: 400);
         }
       }
-
-      if (!mounted) return;
-      setState(() {
-        res = r[0];
-        libs = views;
-        fav = r[2];
-        feat = r[3].where((x) => ((x['BackdropImageTags'] as List?) ?? const []).isNotEmpty).take(6).toList();
-        cols = r[4];
-        lat = latest;
-        studios = st.take(10).toList();
-        loading = false;
-      });
-      _discover();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        loading = false;
-        err = 'Ana sayfa yüklenemedi.\n$e';
-      });
     }
+    if (mounted) setState(() => studios = st);
   }
 
   /// Keşif sıraları ana sayfayı bekletmeden ayrıca gelir.
@@ -164,7 +192,34 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final pad = hPad(context);
     final content = loading
-          ? const Loading()
+          ? (slow
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const CupertinoActivityIndicator(radius: 14),
+                      const SizedBox(height: 18),
+                      const Text('Sunucu yavaş yanıt veriyor', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      const Text('Bekleyebilir, yeniden deneyebilir ya da indirdiklerini izleyebilirsin.',
+                          textAlign: TextAlign.center, style: TextStyle(color: Color(0x99F5F5F7), height: 1.4)),
+                      const SizedBox(height: 18),
+                      PillButton('Yeniden dene', onTap: () {
+                        api.resetConnections();
+                        load();
+                      }),
+                      const SizedBox(height: 10),
+                      Pressable(
+                        onTap: () => tabBus.value = 3,
+                        child: const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: Text('İndirilenlere git', style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ]),
+                  ),
+                )
+              : const Loading())
           : err.isNotEmpty
               ? ErrorView(err, retry: load)
               : NotificationListener<ScrollNotification>(

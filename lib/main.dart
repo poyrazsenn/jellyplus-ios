@@ -340,6 +340,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   static const dlTab = 3;
   final keys = List.generate(5, (_) => GlobalKey<NavigatorState>());
   bool offline = false;
+  DateTime? _pausedAt;
   StreamSubscription<List<ConnectivityResult>>? _net;
 
   static bool _isOff(List<ConnectivityResult> r) => r.isEmpty || r.every((x) => x == ConnectivityResult.none);
@@ -564,7 +565,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.resumed) _online();
+    if (s == AppLifecycleState.paused) _pausedAt = DateTime.now();
+    if (s == AppLifecycleState.resumed) {
+      // 30 sn'den uzun arka planda kaldıysa eski bağlantılar ölmüş olabilir
+      if (_pausedAt != null && DateTime.now().difference(_pausedAt!).inSeconds > 30) Api.I.resetConnections();
+      _pausedAt = null;
+      _online();
+    }
   }
 
   Widget tabNav(int i, Widget root) => Navigator(

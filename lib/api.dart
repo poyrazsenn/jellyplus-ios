@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'version.dart';
@@ -126,18 +129,46 @@ class Api {
     return s;
   }
 
+  // Tek, kalıcı bağlantı havuzu: bağlantı kurulamazsa 8 sn'de vazgeçer, boşta kalan bağlantıyı 15 sn'de kapatır.
+  static http.Client _newClient() => IOClient(HttpClient()
+    ..connectionTimeout = const Duration(seconds: 8)
+    ..idleTimeout = const Duration(seconds: 15));
+  http.Client _c = _newClient();
+
+  /// Uygulama arka plandan dönünce: kopmuş olabilecek eski bağlantıları bırak.
+  void resetConnections() {
+    final old = _c;
+    _c = _newClient();
+    Future.delayed(const Duration(seconds: 30), () {
+      try {
+        old.close();
+      } catch (_) {}
+    });
+  }
+
+  static bool _transient(Object e) =>
+      e is TimeoutException || e is SocketException || e is HttpException || e is http.ClientException || e is HandshakeException;
+
   Future<dynamic> _send(String m, String p, [Object? body]) async {
     final u = Uri.parse('$url$p');
-    const t = Duration(seconds: 25);
     late http.Response r;
-    if (m == 'GET') {
-      r = await http.get(u, headers: headers).timeout(t);
-    } else if (m == 'POST') {
-      r = await http
-          .post(u, headers: headers, body: body == null ? null : jsonEncode(body))
-          .timeout(t);
-    } else {
-      r = await http.delete(u, headers: headers).timeout(t);
+    // GET bir kez kendiliğinden yeniden denenir (yeni bağlantıyla); POST/DELETE tekrarlanmaz.
+    for (var attempt = 0;; attempt++) {
+      try {
+        if (m == 'GET') {
+          r = await _c.get(u, headers: headers).timeout(const Duration(seconds: 15));
+        } else if (m == 'POST') {
+          r = await _c
+              .post(u, headers: headers, body: body == null ? null : jsonEncode(body))
+              .timeout(const Duration(seconds: 20));
+        } else {
+          r = await _c.delete(u, headers: headers).timeout(const Duration(seconds: 20));
+        }
+        break;
+      } catch (e) {
+        if (m != 'GET' || attempt >= 1 || !_transient(e)) rethrow;
+        resetConnections();
+      }
     }
     if (r.statusCode >= 400) throw ApiError(r.statusCode);
     if (r.bodyBytes.isEmpty) return null;
@@ -153,7 +184,7 @@ class Api {
   Future<dynamic> delete(String p) => _send('DELETE', p);
 
   Future<String> getText(String fullUrl) async {
-    final r = await http.get(Uri.parse(fullUrl), headers: headers).timeout(const Duration(seconds: 25));
+    final r = await _c.get(Uri.parse(fullUrl), headers: headers).timeout(const Duration(seconds: 15));
     if (r.statusCode >= 400) throw ApiError(r.statusCode);
     return utf8.decode(r.bodyBytes, allowMalformed: true);
   }
