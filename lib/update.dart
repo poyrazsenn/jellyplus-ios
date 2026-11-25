@@ -109,8 +109,16 @@ Future<void> checkUpdate(BuildContext context, {bool manual = false}) async {
     return;
   }
   if (!manual && p.getString('skipver') == tag) return;
+  // sadece bu sürümün "Yenilikler" bölümü (önceki betalarınkiler değil)
+  var sec = body ?? '';
+  final yi = sec.indexOf('**Yenilikler**');
+  if (yi >= 0) {
+    sec = sec.substring(yi + 14);
+    final end = sec.indexOf('\n**');
+    if (end >= 0) sec = sec.substring(0, end);
+  }
   final news = RegExp(r'^- \*\*(.+?):?\*\*', multiLine: true)
-      .allMatches(body ?? '')
+      .allMatches(sec)
       .map((m) => m.group(1)!.replaceAll(RegExp(r':$'), ''))
       .take(4)
       .toList();
@@ -125,7 +133,8 @@ Future<void> checkUpdate(BuildContext context, {bool manual = false}) async {
         child: Text(
           'Sende ${prettyVersion(kVersion)} var.'
           '${news.isNotEmpty ? '\n\nYenilikler:\n${news.map((n) => '• $n').join('\n')}' : ''}'
-          '\n\n"İndir"e basınca IPA telefonuna iner. Sonra Sideloadly ile her zamanki gibi kur; girişlerin ve indirdiklerin silinmez.',
+          '\n\nSideStore kullanıyorsan: SideStore → My Apps\'ta güncelle. '
+          'Ya da "İndir"e bas, IPA\'yı SideStore\'da + ile veya Sideloadly ile kur. Girişlerin ve indirdiklerin silinmez.',
           textAlign: TextAlign.left,
         ),
       ),

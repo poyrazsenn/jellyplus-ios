@@ -60,6 +60,9 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait" "$P"
           /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:1 string UIInterfaceOrientationLandscapeLeft" "$P"
           /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:2 string UIInterfaceOrientationLandscapeRight" "$P"
+          # SideStore güncellemeyi sürüm adının değişmesinden anlar: her betaya kendi adı (3.0.0-beta.19 gibi)
+          V=$(sed -n "s/^const kVersion = '\(.*\)';/\1/p" lib/version.dart)
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $V" "$P"
 
       - name: Kod kontrolü (hatalar burada görünür)
         run: flutter analyze --no-fatal-infos --no-fatal-warnings || true

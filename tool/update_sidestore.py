@@ -30,7 +30,7 @@ if '**Yenilikler**' in notes:
     desc = '\n'.join(f"• {t.rstrip(':')}: {d}" for t, d in items)
 
 entry = {
-    'version': short,
+    'version': ver,  # IPA'daki CFBundleShortVersionString ile aynı
     'buildVersion': build,
     'marketingVersion': pretty(ver),
     'date': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
