@@ -20,6 +20,16 @@
       "versions": [
         {
           "version": "3.0.0",
+          "buildVersion": "47",
+          "marketingVersion": "3.0 beta 18",
+          "date": "2026-11-25T07:50:23Z",
+          "localizedDescription": "• Profil düğmesi düzeltmesi: Ana sayfadaki profil düğmesi artık sayfa kayarken ya da esnerken de her dokunuşta açılıyor. Düğme biraz büyüdü, basınca hafif titreşiyor.",
+          "downloadURL": "https://github.com/poyrazsenn/jellyplus-ios/releases/download/v3.0.0-beta.18/JellyPlus.ipa",
+          "size": 16381870,
+          "minOSVersion": "14.0"
+        },
+        {
+          "version": "3.0.0",
           "buildVersion": "46",
           "marketingVersion": "3.0 beta 17",
           "date": "2026-11-24T17:10:38Z",
