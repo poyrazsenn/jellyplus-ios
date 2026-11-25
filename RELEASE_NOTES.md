@@ -1,5 +1,9 @@
-## Poyraz Player 3.0 — beta 17
+## Poyraz Player 3.0 — beta 18
 **Yenilikler**
+
+- **Profil düğmesi düzeltmesi:** Ana sayfadaki profil düğmesi artık sayfa kayarken ya da esnerken de her dokunuşta açılıyor. Düğme biraz büyüdü, basınca hafif titreşiyor.
+
+**Beta 17'de gelenler**
 
 - **iPad'de tam ekran detay sayfası:** Görsel ekranı boydan boya kaplıyor; altında solda bilgiler, Oynat ve İndir yan yana, sağda oyuncular ve eylemler. Sekmeler ve afişler bütün genişliği kullanıyor.
 - **Güncelleme uyarısı düzeltmesi:** Sürüm adayları (RC) artık betalardan yeni sayılıyor; 3.0 RC çıkınca uyarı gelecek.
@@ -91,6 +95,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** uzun basınca önizleme menüsü ve ortak ayarlar (beta 18), web istemcisinin yeni görünümü (beta 19, son beta). Ardından 3.0 RC ve 18 Aralık'ta 3.0.
+**Sonraki betalarda:** Keşfet sekmesi, uzun basınca önizleme menüsü ve ortak ayarlar (beta 19), web istemcisinin yeni görünümü (beta 20, son beta). Ardından 3.0 RC ve 18 Aralık'ta 3.0.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.

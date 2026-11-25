@@ -27,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<J> res = [], fav = [], feat = [], cols = [], libs = [];
   List<List<J>> lat = [];
   List<J> top = [], soon = [];
+  final scrollY = ValueNotifier<double>(0);
   List<_Studio> studios = [];
 
   @override
@@ -39,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     refreshBus.removeListener(_silent);
+    scrollY.dispose();
     super.dispose();
   }
 
@@ -161,46 +163,21 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final pad = hPad(context);
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      body: loading
+    final content = loading
           ? const Loading()
           : err.isNotEmpty
               ? ErrorView(err, retry: load)
-              : CustomScrollView(
+              : NotificationListener<ScrollNotification>(
+                  onNotification: (n) {
+                    if (n.depth == 0) scrollY.value = n.metrics.pixels;
+                    return false;
+                  },
+                  child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                   slivers: [
                     SliverToBoxAdapter(
                       child: Stack(children: [
                         HeroCarousel(feat),
-                        if (!wideLayout(context))
-                        Positioned(
-                          left: pad + 4,
-                          right: pad,
-                          top: MediaQuery.paddingOf(context).top + 10,
-                          child: Row(children: [
-                            const Logo(size: 21),
-                            const Spacer(),
-                            Semantics(
-                              button: true,
-                              label: 'Profil',
-                              child: Pressable(
-                                onTap: () => tabBus.value = 4,
-                                child: Glass(
-                                  radius: 19,
-                                  child: SizedBox(
-                                    width: 38,
-                                    height: 38,
-                                    child: Center(
-                                      child: Text(api.name.isEmpty ? '?' : api.name[0].toUpperCase(),
-                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ]),
-                        ),
                       ]),
                     ),
                     CupertinoSliverRefreshControl(onRefresh: () => load(silent: true)),
@@ -254,6 +231,53 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SliverToBoxAdapter(child: SizedBox(height: 120)),
                   ],
                 ),
+                );
+    final safeTop = MediaQuery.paddingOf(context).top;
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      body: Stack(children: [
+        Positioned.fill(child: content),
+        // Logo ve profil kayan içeriğin dışında: sayfa kayarken/esnerken de dokunuş kaçmaz.
+        if (!wideLayout(context) && !loading && err.isEmpty)
+          Positioned(
+            left: pad + 4,
+            right: pad - 3,
+            top: safeTop + 7,
+            child: Row(children: [
+              ValueListenableBuilder<double>(
+                valueListenable: scrollY,
+                builder: (_, y, child) => Opacity(opacity: (1 - y / 140).clamp(0, 1).toDouble(), child: child),
+                child: const IgnorePointer(child: Logo(size: 21)),
+              ),
+              const Spacer(),
+              Semantics(
+                button: true,
+                label: 'Profil',
+                child: Pressable(
+                  haptic: true,
+                  onTap: () => tabBus.value = 4,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: Glass(
+                        radius: 19,
+                        child: SizedBox(
+                          width: 38,
+                          height: 38,
+                          child: Center(
+                            child: Text(api.name.isEmpty ? '?' : api.name[0].toUpperCase(),
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+      ]),
     );
   }
 }
