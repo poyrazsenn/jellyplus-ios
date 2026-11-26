@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'nav.dart';
+import 'preview.dart';
 import 'util.dart';
 
 Widget netImg(String? url,
@@ -271,6 +272,7 @@ class WideCard extends StatelessWidget {
 
     return Pressable(
       onTap: onTap ?? () => openItem(context, item),
+      onLongPress: canPreview(item) ? () => showPreview(context, item) : null,
       child: SizedBox(
         width: width,
         height: width * 9 / 16,

@@ -10,6 +10,7 @@ import 'package:media_kit/media_kit.dart';
 import 'api.dart';
 import 'downloads.dart';
 import 'downloads_screen.dart';
+import 'explore.dart';
 import 'home.dart';
 import 'library.dart';
 import 'nav.dart';
@@ -338,7 +339,9 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int tab = 0;
   static const dlTab = 3;
-  final keys = List.generate(5, (_) => GlobalKey<NavigatorState>());
+  final keys = List.generate(6, (_) => GlobalKey<NavigatorState>());
+  // Sekmelerin ekrandaki sırası → IndexedStack içindeki yeri (Keşfet 5'te)
+  static const order = [0, 5, 1, 2, 3];
   bool offline = false;
   DateTime? _pausedAt;
   StreamSubscription<List<ConnectivityResult>>? _net;
@@ -399,6 +402,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Widget _glassBar(BuildContext context) {
     const items = [
       [Icons.home_outlined, Icons.home_rounded, 'Ana sayfa'],
+      [Icons.explore_outlined, Icons.explore_rounded, 'Keşfet'],
       [Icons.search_rounded, Icons.search_rounded, 'Ara'],
       [Icons.bookmark_border_rounded, Icons.bookmark_rounded, 'Listem'],
       [Icons.download_outlined, Icons.download_rounded, 'İndirilenler'],
@@ -421,23 +425,23 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   for (var i = 0; i < items.length; i++)
                     Semantics(
                       button: true,
-                      selected: tab == i,
+                      selected: tab == order[i],
                       label: items[i][2] as String,
                       child: Pressable(
                         onTap: () {
                           HapticFeedback.selectionClick();
-                          _goTab(i);
+                          _goTab(order[i]);
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: 58,
+                          width: 54,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: tab == i ? Colors.white.withAlpha(42) : Colors.transparent,
+                            color: tab == order[i] ? Colors.white.withAlpha(42) : Colors.transparent,
                             borderRadius: BorderRadius.circular(22),
                           ),
-                          child: Icon((tab == i ? items[i][1] : items[i][0]) as IconData,
-                              size: 25, color: tab == i ? Colors.white : const Color(0x99F5F5F7)),
+                          child: Icon((tab == order[i] ? items[i][1] : items[i][0]) as IconData,
+                              size: 25, color: tab == order[i] ? Colors.white : const Color(0x99F5F5F7)),
                         ),
                       ),
                     ),
@@ -452,7 +456,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   /// iPad: üstte logo, ortada cam sekme kapsülü, sağda profil.
   Widget _topBar(BuildContext context) {
-    const labels = ['Ana sayfa', 'Ara', 'Listem', 'İndirilenler'];
+    const labels = ['Ana sayfa', 'Keşfet', 'Ara', 'Listem', 'İndirilenler'];
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -495,12 +499,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                 for (var i = 0; i < labels.length; i++)
                   Semantics(
                     button: true,
-                    selected: tab == i,
+                    selected: tab == order[i],
                     label: labels[i],
                     child: Pressable(
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        _goTab(i);
+                        _goTab(order[i]);
                       },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -508,14 +512,14 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: tab == i ? Colors.white.withAlpha(46) : Colors.transparent,
+                          color: tab == order[i] ? Colors.white.withAlpha(46) : Colors.transparent,
                           borderRadius: BorderRadius.circular(19),
                         ),
                         child: Text(labels[i],
                             style: TextStyle(
                                 fontSize: 14,
-                                fontWeight: tab == i ? FontWeight.w600 : FontWeight.w500,
-                                color: tab == i ? const Color(0xFFF5F5F7) : const Color(0xB3F5F5F7))),
+                                fontWeight: tab == order[i] ? FontWeight.w600 : FontWeight.w500,
+                                color: tab == order[i] ? const Color(0xFFF5F5F7) : const Color(0xB3F5F5F7))),
                       ),
                     ),
                   ),
@@ -589,6 +593,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       tabNav(2, const LibraryScreen(title: 'Listem', extra: '&IsFavorite=true', root: true)),
       tabNav(3, const DownloadsScreen()),
       tabNav(4, const SettingsScreen()),
+      tabNav(5, const ExploreScreen()),
     ]);
     return PopScope(
       canPop: false,

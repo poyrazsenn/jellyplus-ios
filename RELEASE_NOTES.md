@@ -1,5 +1,13 @@
-## Poyraz Player 3.0 — beta 18
+## Poyraz Player 3.0 — beta 19
 **Yenilikler**
+
+- **Keşfet sekmesi:** Seerr'den bugünün trendleri, popüler filmler ve diziler, yakında vizyona girecek filmler ve başlayacak diziler. Sunucunda olmasa da görürsün; dokunup İste dersin. Sunucunda olanlarda ✓, istediklerinde saat işareti.
+- **Önizleme menüsü:** Bir karta basılı tut: kart büyür, arka plan bulanıklaşır; Oynat, Listeme ekle, İndir, İzlendi olarak işaretle ve Ayrıntılar menüsü açılır.
+- **Ortak ayarlar:** Altyazı dili ve görünümü, otomatik atlama, sonraki bölüm gibi ayarlar Jellyfin hesabına kaydediliyor; iPad'de ve yeni kurulumda aynı geliyor.
+- **Kararlılık:** Ana sayfa önce temel içerikle hızla açılıyor, kalan sıralar arkadan geliyor. Bağlantı takılırsa uygulama kendiliğinden yeniden deniyor; sunucu yavaşsa "Yeniden dene" düğmesi çıkıyor.
+- **SideStore güncellemeleri:** Yeni betalar SideStore'da artık "Update" olarak görünüyor.
+
+**Beta 18'de gelenler**
 
 - **Profil düğmesi düzeltmesi:** Ana sayfadaki profil düğmesi artık sayfa kayarken ya da esnerken de her dokunuşta açılıyor. Düğme biraz büyüdü, basınca hafif titreşiyor.
 
@@ -95,6 +103,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** Keşfet sekmesi, uzun basınca önizleme menüsü ve ortak ayarlar (beta 19), web istemcisinin yeni görünümü (beta 20, son beta). Ardından 3.0 RC ve 18 Aralık'ta 3.0.
+**Sonraki betalarda:** web istemcisinin yeni görünümü ve iPad düzeltmeleri (beta 20, son beta). Ardından 3.0 RC ve 18 Aralık'ta 3.0.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.

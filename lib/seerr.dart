@@ -113,6 +113,21 @@ class Seerr {
     return (((r as Map?)?['episodes'] as List?) ?? const []).map((e) => J.from(e as Map)).toList();
   }
 
+  /// Keşfet sıraları: /discover/trending, /discover/movies, /discover/tv, …/upcoming
+  Future<({List<J> items, int pages})> discover(String path, {int page = 1}) async {
+    final r = await _req('GET', '$path?page=$page&language=tr') as Map?;
+    final kind = path.contains('/tv') ? 'tv' : path.contains('/movies') ? 'movie' : null;
+    final l = ((r?['results'] as List?) ?? const [])
+        .map((e) => J.from(e as Map))
+        .map((e) => e..putIfAbsent('mediaType', () => kind))
+        .where((e) => e['mediaType'] == 'movie' || e['mediaType'] == 'tv')
+        .toList();
+    return (items: l, pages: (r?['totalPages'] as num?)?.toInt() ?? 1);
+  }
+
+  /// Film ya da dizi ayrıntısı (oyuncular dahil)
+  Future<J> details(String type, String id) async => J.from(await _req('GET', '/$type/$id?language=tr') as Map);
+
   /// TMDB "bugün popüler" listesi (Seerr üzerinden; ayrı anahtar gerekmez).
   Future<List<J>> trending({int page = 1}) async {
     final r = await _req('GET', '/discover/trending?page=$page&language=tr');

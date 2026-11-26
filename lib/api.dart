@@ -215,6 +215,7 @@ class Api {
     name = '${me['Name'] ?? name}';
     admin = me['Policy']?['IsAdministrator'] == true;
     await upsertCurrent();
+    unawaited(pullShared());
   }
 
   Future<void> logout() async {
@@ -231,26 +232,120 @@ class Api {
 
   // ---------- tercihler ----------
   String get subLang => prefs.getString('psub') ?? 'tr';
-  set subLang(String v) => prefs.setString('psub', v);
+  set subLang(String v) {
+    prefs.setString('psub', v);
+    sharedChanged();
+  }
   bool get autoSkip => prefs.getBool('auto') ?? false;
-  set autoSkip(bool v) => prefs.setBool('auto', v);
+  set autoSkip(bool v) {
+    prefs.setBool('auto', v);
+    sharedChanged();
+  }
   bool get themeOn => prefs.getBool('theme') ?? true;
-  set themeOn(bool v) => prefs.setBool('theme', v);
+  set themeOn(bool v) {
+    prefs.setBool('theme', v);
+    sharedChanged();
+  }
   bool get compat => prefs.getBool('compat') ?? false;
-  set compat(bool v) => prefs.setBool('compat', v);
+  set compat(bool v) {
+    prefs.setBool('compat', v);
+    sharedChanged();
+  }
   double get subSize => prefs.getDouble('subsize') ?? 1.0;
-  set subSize(double v) => prefs.setDouble('subsize', v);
+  set subSize(double v) {
+    prefs.setDouble('subsize', v);
+    sharedChanged();
+  }
   /// 0 beyaz, 1 sarı
   int get subColor => prefs.getInt('subcolor') ?? 0;
-  set subColor(int v) => prefs.setInt('subcolor', v);
+  set subColor(int v) {
+    prefs.setInt('subcolor', v);
+    sharedChanged();
+  }
   /// 0 gölge, 1 yarı saydam kutu, 2 siyah kutu
   int get subBg => prefs.getInt('subbg') ?? 0;
-  set subBg(int v) => prefs.setInt('subbg', v);
+  set subBg(int v) {
+    prefs.setInt('subbg', v);
+    sharedChanged();
+  }
   /// 0 alt, 1 biraz yukarı, 2 yukarı
   int get subLift => prefs.getInt('sublift') ?? 0;
-  set subLift(int v) => prefs.setInt('sublift', v);
+  set subLift(int v) {
+    prefs.setInt('sublift', v);
+    sharedChanged();
+  }
   bool get autoNext => prefs.getBool('autonext') ?? true;
-  set autoNext(bool v) => prefs.setBool('autonext', v);
+  set autoNext(bool v) {
+    prefs.setBool('autonext', v);
+    sharedChanged();
+  }
+
+  // ---------- ortak ayarlar (Jellyfin hesabında saklanır) ----------
+  /// Telefonda, iPad'de ve yeni kurulumda aynı gelsin diye Jellyfin'in DisplayPreferences'ına yazılır.
+  static const _shared = {
+    'psub': 's', 'auto': 'b', 'autonext': 'b', 'theme': 'b', 'compat': 'b',
+    'subsize': 'd', 'subcolor': 'i', 'subbg': 'i', 'sublift': 'i',
+  };
+  static const _dpPath = '/DisplayPreferences/poyraz?client=poyraz';
+  Timer? _pushT;
+  bool _pulling = false;
+
+  void sharedChanged() {
+    if (_pulling || token.isEmpty) return;
+    _pushT?.cancel();
+    _pushT = Timer(const Duration(seconds: 2), pushShared);
+  }
+
+  Future<void> pushShared() async {
+    try {
+      final d = await get('$_dpPath&userId=$uid');
+      final m = d is Map ? Map<String, dynamic>.from(d) : <String, dynamic>{};
+      final cp = Map<String, dynamic>.from((m['CustomPrefs'] as Map?) ?? const {});
+      for (final k in _shared.keys) {
+        final v = prefs.get(k);
+        if (v != null) cp['p_$k'] = '$v';
+      }
+      cp['p_at'] = '${DateTime.now().millisecondsSinceEpoch}';
+      m
+        ..['CustomPrefs'] = cp
+        ..['Id'] = m['Id'] ?? 'poyraz'
+        ..['Client'] = 'poyraz';
+      await post('$_dpPath&userId=$uid', m);
+    } catch (_) {}
+  }
+
+  /// Girişte: hesaptaki ayarları al. Hesapta hiç yoksa bu cihazdakileri yükle.
+  Future<void> pullShared() async {
+    try {
+      final d = await get('$_dpPath&userId=$uid');
+      final cp = (d is Map ? d['CustomPrefs'] as Map? : null) ?? const {};
+      if (!cp.keys.any((k) => '$k'.startsWith('p_'))) {
+        await pushShared();
+        return;
+      }
+      _pulling = true;
+      for (final e in _shared.entries) {
+        final v = cp['p_${e.key}'];
+        if (v == null) continue;
+        final t = '$v';
+        switch (e.value) {
+          case 's':
+            await prefs.setString(e.key, t);
+          case 'b':
+            await prefs.setBool(e.key, t == 'true');
+          case 'd':
+            final x = double.tryParse(t);
+            if (x != null) await prefs.setDouble(e.key, x);
+          case 'i':
+            final x = int.tryParse(t);
+            if (x != null) await prefs.setInt(e.key, x);
+        }
+      }
+    } catch (_) {
+    } finally {
+      _pulling = false;
+    }
+  }
 
   // ---------- görseller ----------
   String image(String id, String type, {String? tag, int w = 640}) =>

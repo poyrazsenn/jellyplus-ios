@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'api.dart';
 import 'nav.dart';
+import 'preview.dart';
 import 'seerr.dart';
 import 'util.dart';
 import 'widgets.dart';
@@ -366,6 +367,7 @@ class _TopCard extends StatelessWidget {
       label: '$n. ${x['Name'] ?? ''}',
       child: Pressable(
         onTap: () => openItem(context, x),
+        onLongPress: () => showPreview(context, x),
         child: SizedBox(
           width: w,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -739,6 +741,7 @@ class PosterTile extends StatelessWidget {
       label: '${n != null ? '$n. ' : ''}${x['Name'] ?? ''}${current ? ', şu an açık' : ''}',
       child: Pressable(
         onTap: current ? null : () => openItem(context, x),
+        onLongPress: canPreview(x) ? () => showPreview(context, x) : null,
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(

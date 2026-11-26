@@ -194,6 +194,8 @@ const _icons = {
   'audio': Icons.graphic_eq,
   'night': Icons.nightlight_outlined,
   'top': Icons.emoji_events_outlined,
+  'explore': Icons.explore_outlined,
+  'sync': Icons.sync_rounded,
   'calendar': Icons.calendar_month_outlined,
   'order': Icons.format_list_numbered_rounded,
   'speed': Icons.speed,
