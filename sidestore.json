@@ -27,26 +27,6 @@
           "downloadURL": "https://github.com/poyrazsenn/jellyplus-ios/releases/download/v3.0.0-beta.18/JellyPlus.ipa",
           "size": 16381870,
           "minOSVersion": "14.0"
-        },
-        {
-          "version": "3.0.0",
-          "buildVersion": "46",
-          "marketingVersion": "3.0 beta 17",
-          "date": "2026-11-24T17:10:38Z",
-          "localizedDescription": "• iPad'de tam ekran detay sayfası: Görsel ekranı boydan boya kaplıyor; altında solda bilgiler, Oynat ve İndir yan yana, sağda oyuncular ve eylemler. Sekmeler ve afişler bütün genişliği kullanıyor.\n• Güncelleme uyarısı düzeltmesi: Sürüm adayları (RC) artık betalardan yeni sayılıyor; 3.0 RC çıkınca uyarı gelecek.",
-          "downloadURL": "https://github.com/poyrazsenn/jellyplus-ios/releases/download/v3.0.0-beta.17/JellyPlus.ipa",
-          "size": 16380900,
-          "minOSVersion": "14.0"
-        },
-        {
-          "version": "3.0.0",
-          "buildVersion": "45",
-          "marketingVersion": "3.0 beta 16",
-          "date": "2026-11-24T09:28:15Z",
-          "localizedDescription": "",
-          "downloadURL": "https://github.com/poyrazsenn/jellyplus-ios/releases/download/v3.0.0-beta.16/JellyPlus.ipa",
-          "size": 16376511,
-          "minOSVersion": "14.0"
         }
       ],
       "appPermissions": {
