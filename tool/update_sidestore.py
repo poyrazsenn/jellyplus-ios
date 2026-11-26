@@ -40,7 +40,7 @@ entry = {
     'minOSVersion': '14.0',
 }
 app = src['apps'][0]
-app['versions'] = [entry] + [v for v in app.get('versions', []) if v.get('downloadURL') != entry['downloadURL']][:9]
+app['versions'] = [entry]  # eski betalar desteklenmiyor: kaynakta sadece en yeni sürüm
 
 body = json.dumps({
     'message': f'SideStore kaynağı: Poyraz Player {pretty(ver)}',
