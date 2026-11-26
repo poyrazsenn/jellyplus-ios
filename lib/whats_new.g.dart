@@ -3,5 +3,5 @@
 
 /// [simge anahtarı, başlık, açıklama]
 const kWhatsNew = <List<String>>[
-  ['calendar', 'Yakında: doğru yayın günleri', 'Yeni bölüm tarihleri artık TVmaze\'den geliyor; dijital platformda çıkan diziler (ör. Paramount+\'ta Cuma) doğru günde görünüyor. Bölüm adları ve görselleri yine Seerr\'den Türkçe.'],
+  ['preview', 'Önizleme menüsü düzeltmesi', 'Basılı tutunca açılan menüde yazılar kırmızı ve altı çizili çıkıyordu; artık doğru görünüyor.'],
 ];

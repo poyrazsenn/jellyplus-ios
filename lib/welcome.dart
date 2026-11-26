@@ -60,7 +60,7 @@ class _WelcomeTourState extends State<WelcomeTour> {
             h: 150,
             r: 24)),
     _Card('Her şey yerinde',
-        'Girişlerin, indirdiklerin, izleme geçmişin ve ayarların olduğu gibi duruyor. iPad düzeni ve keşif özellikleri sonraki betalarda.',
+        'Girişlerin, indirdiklerin, izleme geçmişin ve ayarların olduğu gibi duruyor. iPad\'de üstte sekme kapsülü ve iki sütunlu sayfalar seni bekliyor.',
         const [Color(0xFF34506B), Color(0xFF16222E)],
         () => Container(
               width: 140,
@@ -194,6 +194,8 @@ const _icons = {
   'audio': Icons.graphic_eq,
   'night': Icons.nightlight_outlined,
   'top': Icons.emoji_events_outlined,
+  'explore': Icons.explore_outlined,
+  'sync': Icons.sync_rounded,
   'calendar': Icons.calendar_month_outlined,
   'order': Icons.format_list_numbered_rounded,
   'speed': Icons.speed,

@@ -1,5 +1,37 @@
-## Poyraz Player 3.0 — beta 14
+## Poyraz Player 3.0 — beta 20
 **Yenilikler**
+
+- **Önizleme menüsü düzeltmesi:** Basılı tutunca açılan menüde yazılar kırmızı ve altı çizili çıkıyordu; artık doğru görünüyor.
+
+**Beta 19'da gelenler**
+
+- **Keşfet sekmesi:** Seerr'den bugünün trendleri, popüler filmler ve diziler, yakında vizyona girecek filmler ve başlayacak diziler. Sunucunda olmasa da görürsün; dokunup İste dersin. Sunucunda olanlarda ✓, istediklerinde saat işareti.
+- **Önizleme menüsü:** Bir karta basılı tut: kart büyür, arka plan bulanıklaşır; Oynat, Listeme ekle, İndir, İzlendi olarak işaretle ve Ayrıntılar menüsü açılır.
+- **Ortak ayarlar:** Altyazı dili ve görünümü, otomatik atlama, sonraki bölüm gibi ayarlar Jellyfin hesabına kaydediliyor; iPad'de ve yeni kurulumda aynı geliyor.
+- **Kararlılık:** Ana sayfa önce temel içerikle hızla açılıyor, kalan sıralar arkadan geliyor. Bağlantı takılırsa uygulama kendiliğinden yeniden deniyor; sunucu yavaşsa "Yeniden dene" düğmesi çıkıyor.
+- **SideStore güncellemeleri:** Yeni betalar SideStore'da artık "Update" olarak görünüyor.
+
+**Beta 18'de gelenler**
+
+- **Profil düğmesi düzeltmesi:** Ana sayfadaki profil düğmesi artık sayfa kayarken ya da esnerken de her dokunuşta açılıyor. Düğme biraz büyüdü, basınca hafif titreşiyor.
+
+**Beta 17'de gelenler**
+
+- **iPad'de tam ekran detay sayfası:** Görsel ekranı boydan boya kaplıyor; altında solda bilgiler, Oynat ve İndir yan yana, sağda oyuncular ve eylemler. Sekmeler ve afişler bütün genişliği kullanıyor.
+- **Güncelleme uyarısı düzeltmesi:** Sürüm adayları (RC) artık betalardan yeni sayılıyor; 3.0 RC çıkınca uyarı gelecek.
+
+**Beta 16'da gelenler**
+
+- **Yeni dizi ve film sayfası:** Üstte görsel, altında başlık, bilgi satırı, Devam et ve İndir düğmeleri, kalan süre, oyuncular ve simgeli eylemler. Sekmeler artık yazı halinde: Bölümler, Koleksiyon, Benzerleri, Detaylar.
+- **Koleksiyon sekmesi ve sayfası:** Seriye ait yapımların sayfasında Koleksiyon sekmesi; afişler çıkış sırasıyla numaralı. Koleksiyona girince kendi sayfası açılıyor: kaçını izlediğin ve "Sırayla izle" düğmesi.
+- **Güncelleme bildirimi:** Yeni sürüm çıkınca uygulama haber veriyor, "İndir"e basınca IPA doğrudan iniyor. Profil → Güncellemeleri denetle ile elle de bakabilirsin.
+
+**Beta 15'te gelenler**
+
+- **iPad düzeni:** iPad'de alt bar yerine üstte cam sekme kapsülü; solda logo, sağda profil. Aynı uygulama, ekran genişliğine göre kendiliğinden geçiyor.
+- **İki sütunlu detay:** Yatay iPad'de detay sayfası ikiye bölünüyor; solda görsel, bilgiler ve oynat, sağda bölümler ve sekmeler.
+
+**Beta 14'te gelenler**
 
 - **Yakında: doğru yayın günleri:** Yeni bölüm tarihleri artık TVmaze'den geliyor; dijital platformda çıkan diziler (ör. Paramount+'ta Cuma) doğru günde görünüyor. Bölüm adları ve görselleri yine Seerr'den Türkçe.
 
@@ -75,6 +107,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** iPad düzeni, uzun basınca önizleme menüsü, ortak ayarlar, web istemcisinin yeni görünümü.
+**Sonraki betalarda:** web istemcisinin yeni görünümü ve iPad düzeltmeleri (beta 21, son beta). Ardından 3.0 RC ve 18 Aralık'ta 3.0.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.

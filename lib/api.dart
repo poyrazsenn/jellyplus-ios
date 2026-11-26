@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'version.dart';
@@ -126,18 +129,46 @@ class Api {
     return s;
   }
 
+  // Tek, kalıcı bağlantı havuzu: bağlantı kurulamazsa 8 sn'de vazgeçer, boşta kalan bağlantıyı 15 sn'de kapatır.
+  static http.Client _newClient() => IOClient(HttpClient()
+    ..connectionTimeout = const Duration(seconds: 8)
+    ..idleTimeout = const Duration(seconds: 15));
+  http.Client _c = _newClient();
+
+  /// Uygulama arka plandan dönünce: kopmuş olabilecek eski bağlantıları bırak.
+  void resetConnections() {
+    final old = _c;
+    _c = _newClient();
+    Future.delayed(const Duration(seconds: 30), () {
+      try {
+        old.close();
+      } catch (_) {}
+    });
+  }
+
+  static bool _transient(Object e) =>
+      e is TimeoutException || e is SocketException || e is HttpException || e is http.ClientException || e is HandshakeException;
+
   Future<dynamic> _send(String m, String p, [Object? body]) async {
     final u = Uri.parse('$url$p');
-    const t = Duration(seconds: 25);
     late http.Response r;
-    if (m == 'GET') {
-      r = await http.get(u, headers: headers).timeout(t);
-    } else if (m == 'POST') {
-      r = await http
-          .post(u, headers: headers, body: body == null ? null : jsonEncode(body))
-          .timeout(t);
-    } else {
-      r = await http.delete(u, headers: headers).timeout(t);
+    // GET bir kez kendiliğinden yeniden denenir (yeni bağlantıyla); POST/DELETE tekrarlanmaz.
+    for (var attempt = 0;; attempt++) {
+      try {
+        if (m == 'GET') {
+          r = await _c.get(u, headers: headers).timeout(const Duration(seconds: 15));
+        } else if (m == 'POST') {
+          r = await _c
+              .post(u, headers: headers, body: body == null ? null : jsonEncode(body))
+              .timeout(const Duration(seconds: 20));
+        } else {
+          r = await _c.delete(u, headers: headers).timeout(const Duration(seconds: 20));
+        }
+        break;
+      } catch (e) {
+        if (m != 'GET' || attempt >= 1 || !_transient(e)) rethrow;
+        resetConnections();
+      }
     }
     if (r.statusCode >= 400) throw ApiError(r.statusCode);
     if (r.bodyBytes.isEmpty) return null;
@@ -153,7 +184,7 @@ class Api {
   Future<dynamic> delete(String p) => _send('DELETE', p);
 
   Future<String> getText(String fullUrl) async {
-    final r = await http.get(Uri.parse(fullUrl), headers: headers).timeout(const Duration(seconds: 25));
+    final r = await _c.get(Uri.parse(fullUrl), headers: headers).timeout(const Duration(seconds: 15));
     if (r.statusCode >= 400) throw ApiError(r.statusCode);
     return utf8.decode(r.bodyBytes, allowMalformed: true);
   }
@@ -184,6 +215,7 @@ class Api {
     name = '${me['Name'] ?? name}';
     admin = me['Policy']?['IsAdministrator'] == true;
     await upsertCurrent();
+    unawaited(pullShared());
   }
 
   Future<void> logout() async {
@@ -200,26 +232,120 @@ class Api {
 
   // ---------- tercihler ----------
   String get subLang => prefs.getString('psub') ?? 'tr';
-  set subLang(String v) => prefs.setString('psub', v);
+  set subLang(String v) {
+    prefs.setString('psub', v);
+    sharedChanged();
+  }
   bool get autoSkip => prefs.getBool('auto') ?? false;
-  set autoSkip(bool v) => prefs.setBool('auto', v);
+  set autoSkip(bool v) {
+    prefs.setBool('auto', v);
+    sharedChanged();
+  }
   bool get themeOn => prefs.getBool('theme') ?? true;
-  set themeOn(bool v) => prefs.setBool('theme', v);
+  set themeOn(bool v) {
+    prefs.setBool('theme', v);
+    sharedChanged();
+  }
   bool get compat => prefs.getBool('compat') ?? false;
-  set compat(bool v) => prefs.setBool('compat', v);
+  set compat(bool v) {
+    prefs.setBool('compat', v);
+    sharedChanged();
+  }
   double get subSize => prefs.getDouble('subsize') ?? 1.0;
-  set subSize(double v) => prefs.setDouble('subsize', v);
+  set subSize(double v) {
+    prefs.setDouble('subsize', v);
+    sharedChanged();
+  }
   /// 0 beyaz, 1 sarı
   int get subColor => prefs.getInt('subcolor') ?? 0;
-  set subColor(int v) => prefs.setInt('subcolor', v);
+  set subColor(int v) {
+    prefs.setInt('subcolor', v);
+    sharedChanged();
+  }
   /// 0 gölge, 1 yarı saydam kutu, 2 siyah kutu
   int get subBg => prefs.getInt('subbg') ?? 0;
-  set subBg(int v) => prefs.setInt('subbg', v);
+  set subBg(int v) {
+    prefs.setInt('subbg', v);
+    sharedChanged();
+  }
   /// 0 alt, 1 biraz yukarı, 2 yukarı
   int get subLift => prefs.getInt('sublift') ?? 0;
-  set subLift(int v) => prefs.setInt('sublift', v);
+  set subLift(int v) {
+    prefs.setInt('sublift', v);
+    sharedChanged();
+  }
   bool get autoNext => prefs.getBool('autonext') ?? true;
-  set autoNext(bool v) => prefs.setBool('autonext', v);
+  set autoNext(bool v) {
+    prefs.setBool('autonext', v);
+    sharedChanged();
+  }
+
+  // ---------- ortak ayarlar (Jellyfin hesabında saklanır) ----------
+  /// Telefonda, iPad'de ve yeni kurulumda aynı gelsin diye Jellyfin'in DisplayPreferences'ına yazılır.
+  static const _shared = {
+    'psub': 's', 'auto': 'b', 'autonext': 'b', 'theme': 'b', 'compat': 'b',
+    'subsize': 'd', 'subcolor': 'i', 'subbg': 'i', 'sublift': 'i',
+  };
+  static const _dpPath = '/DisplayPreferences/poyraz?client=poyraz';
+  Timer? _pushT;
+  bool _pulling = false;
+
+  void sharedChanged() {
+    if (_pulling || token.isEmpty) return;
+    _pushT?.cancel();
+    _pushT = Timer(const Duration(seconds: 2), pushShared);
+  }
+
+  Future<void> pushShared() async {
+    try {
+      final d = await get('$_dpPath&userId=$uid');
+      final m = d is Map ? Map<String, dynamic>.from(d) : <String, dynamic>{};
+      final cp = Map<String, dynamic>.from((m['CustomPrefs'] as Map?) ?? const {});
+      for (final k in _shared.keys) {
+        final v = prefs.get(k);
+        if (v != null) cp['p_$k'] = '$v';
+      }
+      cp['p_at'] = '${DateTime.now().millisecondsSinceEpoch}';
+      m
+        ..['CustomPrefs'] = cp
+        ..['Id'] = m['Id'] ?? 'poyraz'
+        ..['Client'] = 'poyraz';
+      await post('$_dpPath&userId=$uid', m);
+    } catch (_) {}
+  }
+
+  /// Girişte: hesaptaki ayarları al. Hesapta hiç yoksa bu cihazdakileri yükle.
+  Future<void> pullShared() async {
+    try {
+      final d = await get('$_dpPath&userId=$uid');
+      final cp = (d is Map ? d['CustomPrefs'] as Map? : null) ?? const {};
+      if (!cp.keys.any((k) => '$k'.startsWith('p_'))) {
+        await pushShared();
+        return;
+      }
+      _pulling = true;
+      for (final e in _shared.entries) {
+        final v = cp['p_${e.key}'];
+        if (v == null) continue;
+        final t = '$v';
+        switch (e.value) {
+          case 's':
+            await prefs.setString(e.key, t);
+          case 'b':
+            await prefs.setBool(e.key, t == 'true');
+          case 'd':
+            final x = double.tryParse(t);
+            if (x != null) await prefs.setDouble(e.key, x);
+          case 'i':
+            final x = int.tryParse(t);
+            if (x != null) await prefs.setInt(e.key, x);
+        }
+      }
+    } catch (_) {
+    } finally {
+      _pulling = false;
+    }
+  }
 
   // ---------- görseller ----------
   String image(String id, String type, {String? tag, int w = 640}) =>

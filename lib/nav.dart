@@ -1,6 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'discover.dart';
 import 'detail.dart';
 import 'library.dart';
 import 'player.dart';
@@ -9,7 +11,7 @@ import 'theme_music.dart';
 /// Kart/vitrin tıklaması: bölümse dizisine, koleksiyonsa içeriğine, değilse detaya git.
 Future<void> openItem(BuildContext c, J it) async {
   if (it['Type'] == 'BoxSet') {
-    await openLibrary(c, '${it['Name'] ?? 'Koleksiyon'}', '&ParentId=${it['Id']}');
+    await Navigator.of(c).push(CupertinoPageRoute(builder: (_) => CollectionScreen(id: '${it['Id']}')));
     return;
   }
   final t = it['Type'];

@@ -292,6 +292,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: 'Bu sürümdeki yenilikler',
             onTap: () => showWhatsNew(context, force: true),
           ),
+          _Row(
+            lead: _tile(Icons.system_update_rounded, const Color(0xFF0A84FF)),
+            label: 'Güncellemeleri denetle',
+            onTap: () => checkUpdate(context, manual: true),
+          ),
         ]),
 
         const SizedBox(height: 28),
@@ -314,6 +319,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const Center(child: PMark(size: 26)),
         const SizedBox(height: 6),
         const Center(child: Text('Poyraz Player $kVersion', style: TextStyle(color: Color(0x66F5F5F7), fontSize: 12))),
+        const SizedBox(height: 4),
+        const Center(
+          child: Text('Oynatma ve altyazı ayarların Jellyfin hesabına kaydedilir; iPad\'de ve yeni kurulumda aynı gelir.',
+              textAlign: TextAlign.center, style: TextStyle(color: Color(0x4DF5F5F7), fontSize: 11)),
+        ),
       ],
     );
   }

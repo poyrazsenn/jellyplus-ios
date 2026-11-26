@@ -10,6 +10,7 @@ import 'package:media_kit/media_kit.dart';
 import 'api.dart';
 import 'downloads.dart';
 import 'downloads_screen.dart';
+import 'explore.dart';
 import 'home.dart';
 import 'library.dart';
 import 'nav.dart';
@@ -338,8 +339,11 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int tab = 0;
   static const dlTab = 3;
-  final keys = List.generate(5, (_) => GlobalKey<NavigatorState>());
+  final keys = List.generate(6, (_) => GlobalKey<NavigatorState>());
+  // Sekmelerin ekrandaki sırası → IndexedStack içindeki yeri (Keşfet 5'te)
+  static const order = [0, 5, 1, 2, 3];
   bool offline = false;
+  DateTime? _pausedAt;
   StreamSubscription<List<ConnectivityResult>>? _net;
 
   static bool _isOff(List<ConnectivityResult> r) => r.isEmpty || r.every((x) => x == ConnectivityResult.none);
@@ -398,6 +402,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Widget _glassBar(BuildContext context) {
     const items = [
       [Icons.home_outlined, Icons.home_rounded, 'Ana sayfa'],
+      [Icons.explore_outlined, Icons.explore_rounded, 'Keşfet'],
       [Icons.search_rounded, Icons.search_rounded, 'Ara'],
       [Icons.bookmark_border_rounded, Icons.bookmark_rounded, 'Listem'],
       [Icons.download_outlined, Icons.download_rounded, 'İndirilenler'],
@@ -420,23 +425,23 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   for (var i = 0; i < items.length; i++)
                     Semantics(
                       button: true,
-                      selected: tab == i,
+                      selected: tab == order[i],
                       label: items[i][2] as String,
                       child: Pressable(
                         onTap: () {
                           HapticFeedback.selectionClick();
-                          _goTab(i);
+                          _goTab(order[i]);
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: 58,
+                          width: 54,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: tab == i ? Colors.white.withAlpha(42) : Colors.transparent,
+                            color: tab == order[i] ? Colors.white.withAlpha(42) : Colors.transparent,
                             borderRadius: BorderRadius.circular(22),
                           ),
-                          child: Icon((tab == i ? items[i][1] : items[i][0]) as IconData,
-                              size: 25, color: tab == i ? Colors.white : const Color(0x99F5F5F7)),
+                          child: Icon((tab == order[i] ? items[i][1] : items[i][0]) as IconData,
+                              size: 25, color: tab == order[i] ? Colors.white : const Color(0x99F5F5F7)),
                         ),
                       ),
                     ),
@@ -444,6 +449,83 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// iPad: üstte logo, ortada cam sekme kapsülü, sağda profil.
+  Widget _topBar(BuildContext context) {
+    const labels = ['Ana sayfa', 'Keşfet', 'Ara', 'Listem', 'İndirilenler'];
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(36, 8, 36, 0),
+        child: SizedBox(
+          height: 50,
+          child: Stack(alignment: Alignment.center, children: [
+            Row(children: [
+              const Logo(size: 20),
+              const Spacer(),
+              Semantics(
+                button: true,
+                selected: tab == 4,
+                label: 'Profil',
+                child: Pressable(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _goTab(4);
+                  },
+                  child: Glass(
+                    radius: 20,
+                    color: tab == 4 ? const Color(0x52FFFFFF) : kGlass,
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Center(
+                        child: Text(Api.I.name.isEmpty ? '?' : Api.I.name[0].toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+            Glass(
+              radius: 26,
+              color: const Color(0xB326262C),
+              padding: const EdgeInsets.all(5),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                for (var i = 0; i < labels.length; i++)
+                  Semantics(
+                    button: true,
+                    selected: tab == order[i],
+                    label: labels[i],
+                    child: Pressable(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        _goTab(order[i]);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: tab == order[i] ? Colors.white.withAlpha(46) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(19),
+                        ),
+                        child: Text(labels[i],
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: tab == order[i] ? FontWeight.w600 : FontWeight.w500,
+                                color: tab == order[i] ? const Color(0xFFF5F5F7) : const Color(0xB3F5F5F7))),
+                      ),
+                    ),
+                  ),
+              ]),
+            ),
+          ]),
         ),
       ),
     );
@@ -487,7 +569,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.resumed) _online();
+    if (s == AppLifecycleState.paused) _pausedAt = DateTime.now();
+    if (s == AppLifecycleState.resumed) {
+      // 30 sn'den uzun arka planda kaldıysa eski bağlantılar ölmüş olabilir
+      if (_pausedAt != null && DateTime.now().difference(_pausedAt!).inSeconds > 30) Api.I.resetConnections();
+      _pausedAt = null;
+      _online();
+    }
   }
 
   Widget tabNav(int i, Widget root) => Navigator(
@@ -497,6 +585,16 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final tablet = wideLayout(context);
+    final mq = MediaQuery.of(context);
+    final stack = IndexedStack(index: tab, children: [
+      tabNav(0, const HomeScreen()),
+      tabNav(1, const SearchScreen()),
+      tabNav(2, const LibraryScreen(title: 'Listem', extra: '&IsFavorite=true', root: true)),
+      tabNav(3, const DownloadsScreen()),
+      tabNav(4, const SettingsScreen()),
+      tabNav(5, const ExploreScreen()),
+    ]);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -504,13 +602,19 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         keys[tab].currentState?.maybePop();
       },
       child: Scaffold(
-        body: IndexedStack(index: tab, children: [
-          tabNav(0, const HomeScreen()),
-          tabNav(1, const SearchScreen()),
-          tabNav(2, const LibraryScreen(title: 'Listem', extra: '&IsFavorite=true', root: true)),
-          tabNav(3, const DownloadsScreen()),
-          tabNav(4, const SettingsScreen()),
-        ]),
+        body: tablet
+            ? Stack(children: [
+                // sayfalar, üst çubuğun altından başlasın diye üst boşluk büyütülür
+                MediaQuery(
+                  data: mq.copyWith(
+                    padding: mq.padding.copyWith(top: mq.padding.top + 60),
+                    viewPadding: mq.viewPadding.copyWith(top: mq.viewPadding.top + 60),
+                  ),
+                  child: stack,
+                ),
+                Positioned(left: 0, right: 0, top: 0, child: _topBar(context)),
+              ])
+            : stack,
         bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
           AnimatedSize(
             duration: const Duration(milliseconds: 250),
@@ -532,7 +636,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   )
                 : const SizedBox(width: double.infinity),
           ),
-          _glassBar(context),
+          if (!tablet) _glassBar(context) else SizedBox(height: mq.padding.bottom),
         ]),
       ),
     );

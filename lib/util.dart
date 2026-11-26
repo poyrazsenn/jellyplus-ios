@@ -13,6 +13,12 @@ const kAccent = Color(0xFFFFC98F); // sıcak ışık (logo üçgeni, vurgular)
 const kMuted = Color(0xFF9C9CA6);
 const kGlass = Color(0x9926262C); // buğulu cam dolgusu
 
+/// iPad (ya da geniş pencere): üst sekme kapsülü
+bool wideLayout(BuildContext c) => MediaQuery.sizeOf(c).width > 700;
+
+/// Yatay iPad: iki sütunlu detay sayfası
+bool isSplit(BuildContext c) => MediaQuery.sizeOf(c).width >= 900;
+
 double hPad(BuildContext c) => MediaQuery.sizeOf(c).width > 700 ? 28 : 16;
 
 /// Bir sırada kaç kart görünsün: telefon ~2.15, iPad ~3.3, geniş ~5.25
