@@ -24,7 +24,14 @@ Future<void> showPreview(BuildContext context, J x) {
     barrierLabel: 'Kapat',
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 260),
-    pageBuilder: (c, _, __) => _Preview(x, origin: context),
+    // Diyalogda Material/yazı stili yok: kendimiz veriyoruz (yoksa yazılar kırmızı ve altı çizili çıkar)
+    pageBuilder: (c, _, __) => Material(
+      type: MaterialType.transparency,
+      child: DefaultTextStyle(
+        style: const TextStyle(color: Color(0xFFF5F5F7), fontSize: 14, decoration: TextDecoration.none),
+        child: _Preview(x, origin: context),
+      ),
+    ),
     transitionBuilder: (c, a, _, child) {
       final t = CurvedAnimation(parent: a, curve: Curves.easeOutBack, reverseCurve: Curves.easeInCubic);
       return FadeTransition(

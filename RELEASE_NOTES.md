@@ -1,5 +1,9 @@
-## Poyraz Player 3.0 — beta 19
+## Poyraz Player 3.0 — beta 20
 **Yenilikler**
+
+- **Önizleme menüsü düzeltmesi:** Basılı tutunca açılan menüde yazılar kırmızı ve altı çizili çıkıyordu; artık doğru görünüyor.
+
+**Beta 19'da gelenler**
 
 - **Keşfet sekmesi:** Seerr'den bugünün trendleri, popüler filmler ve diziler, yakında vizyona girecek filmler ve başlayacak diziler. Sunucunda olmasa da görürsün; dokunup İste dersin. Sunucunda olanlarda ✓, istediklerinde saat işareti.
 - **Önizleme menüsü:** Bir karta basılı tut: kart büyür, arka plan bulanıklaşır; Oynat, Listeme ekle, İndir, İzlendi olarak işaretle ve Ayrıntılar menüsü açılır.
@@ -103,6 +107,6 @@
 - Detay sayfasında Listem, İndir, Fragman gibi eylemler cam kutular; sekmeler iOS bölümlü seçici.
 - Uygulama ana ekranda "Poyraz" adıyla görünür.
 
-**Sonraki betalarda:** web istemcisinin yeni görünümü ve iPad düzeltmeleri (beta 20, son beta). Ardından 3.0 RC ve 18 Aralık'ta 3.0.
+**Sonraki betalarda:** web istemcisinin yeni görünümü ve iPad düzeltmeleri (beta 21, son beta). Ardından 3.0 RC ve 18 Aralık'ta 3.0.
 
 **Kurulum:** `JellyPlus.ipa`'yı indirip Sideloadly ile eskisinin üzerine kur. Girişlerin ve indirdiklerin silinmez.
