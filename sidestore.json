@@ -19,13 +19,13 @@
       "screenshots": [],
       "versions": [
         {
-          "version": "3.0.0-beta.19",
-          "buildVersion": "48",
-          "marketingVersion": "3.0 beta 19",
-          "date": "2026-11-26T17:27:16Z",
-          "localizedDescription": "• Keşfet sekmesi: Seerr'den bugünün trendleri, popüler filmler ve diziler, yakında vizyona girecek filmler ve başlayacak diziler. Sunucunda olmasa da görürsün; dokunup İste dersin. Sunucunda olanlarda ✓, istediklerinde saat işareti.\n• Önizleme menüsü: Bir karta basılı tut: kart büyür, arka plan bulanıklaşır; Oynat, Listeme ekle, İndir, İzlendi olarak işaretle ve Ayrıntılar menüsü açılır.\n• Ortak ayarlar: Altyazı dili ve görünümü, otomatik atlama, sonraki bölüm gibi ayarlar Jellyfin hesabına kaydediliyor; iPad'de ve yeni kurulumda aynı geliyor.\n• Kararlılık: Ana sayfa önce temel içerikle hızla açılıyor, kalan sıralar arkadan geliyor. Bağlantı takılırsa uygulama kendiliğinden yeniden deniyor; sunucu yavaşsa \"Yeniden dene\" düğmesi çıkıyor.\n• SideStore güncellemeleri: Yeni betalar SideStore'da artık \"Update\" olarak görünüyor.",
-          "downloadURL": "https://github.com/poyrazsenn/jellyplus-ios/releases/download/v3.0.0-beta.19/JellyPlus.ipa",
-          "size": 16412785,
+          "version": "3.0.0-beta.20",
+          "buildVersion": "49",
+          "marketingVersion": "3.0 beta 20",
+          "date": "2026-11-26T17:40:16Z",
+          "localizedDescription": "• Önizleme menüsü düzeltmesi: Basılı tutunca açılan menüde yazılar kırmızı ve altı çizili çıkıyordu; artık doğru görünüyor.",
+          "downloadURL": "https://github.com/poyrazsenn/jellyplus-ios/releases/download/v3.0.0-beta.20/JellyPlus.ipa",
+          "size": 16412316,
           "minOSVersion": "14.0"
         }
       ],
