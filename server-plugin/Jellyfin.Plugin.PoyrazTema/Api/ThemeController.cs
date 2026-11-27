@@ -67,6 +67,80 @@ public class ThemeController : ControllerBase
         }
     }
 
+    /// <summary>Teması olmayan yapımlar (isteğe bağlı ada göre süzülür), en yeni eklenenler önce.</summary>
+    [HttpGet("Missing")]
+    public ActionResult Missing([FromQuery] string? q)
+    {
+        var cfg = Plugin.Instance!.Configuration;
+        var store = ThemeStore.Load();
+        var all = FindThemesTask.Missing(_library, cfg);
+        var list = all
+            .Where(i => string.IsNullOrWhiteSpace(q)
+                || i.Name.Contains(q.Trim(), StringComparison.CurrentCultureIgnoreCase)
+                || (i.OriginalTitle ?? string.Empty).Contains(q.Trim(), StringComparison.CurrentCultureIgnoreCase))
+            .OrderByDescending(i => i.DateCreated)
+            .Take(150)
+            .Select(i =>
+            {
+                store.TryGetValue(i.Id.ToString("N"), out var r);
+                return new
+                {
+                    ItemId = i.Id.ToString("N"),
+                    i.Name,
+                    Year = i.ProductionYear,
+                    Type = i is MediaBrowser.Controller.Entities.TV.Series ? "Dizi" : "Film",
+                    Status = r?.Status ?? "waiting",
+                    r?.Message,
+                };
+            });
+        return Ok(new { Total = all.Count, Items = list });
+    }
+
+    /// <summary>Tek bir yapım için hemen ara ve indir (gecelik sınırı beklemeden).</summary>
+    [HttpPost("Find")]
+    public async Task<ActionResult<ThemeRecord>> Find([FromQuery] string itemId, CancellationToken ct)
+    {
+        if (!Guid.TryParse(itemId, out var id))
+        {
+            return BadRequest("itemId gerekli.");
+        }
+
+        var item = _library.GetItemById(id);
+        if (item == null)
+        {
+            return NotFound();
+        }
+
+        var dir = FindThemesTask.FolderFor(item, out var why);
+        if (dir == null)
+        {
+            return BadRequest(why ?? "Klasör bulunamadı.");
+        }
+
+        ThemeRecord rec;
+        try
+        {
+            var best = await FindThemesTask.FindBestAsync(_finder, item, Plugin.Instance!.Configuration, ct).ConfigureAwait(false);
+            if (best == null)
+            {
+                rec = FindThemesTask.Rec(item, "notfound", null, null, "Uygun sonuç bulunamadı. Bağlantıyı elle verebilirsin.");
+            }
+            else
+            {
+                await _finder.DownloadAsync(best.Url, dir, ct).ConfigureAwait(false);
+                rec = FindThemesTask.Rec(item, "found", best.Url, best.Title, null);
+                _library.QueueLibraryScan();
+            }
+        }
+        catch (Exception e)
+        {
+            rec = FindThemesTask.Rec(item, "error", null, null, e.Message);
+        }
+
+        ThemeStore.Put(rec);
+        return Ok(rec);
+    }
+
     /// <summary>Kaydı sil: bir sonraki çalıştırmada yeniden aransın.</summary>
     [HttpPost("Retry")]
     public ActionResult Retry([FromQuery] string itemId)
