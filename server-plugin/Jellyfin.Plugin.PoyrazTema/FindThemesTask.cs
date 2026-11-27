@@ -85,8 +85,8 @@ public class FindThemesTask : IScheduledTask
         return library.GetItemList(new InternalItemsQuery { IncludeItemTypes = kinds.ToArray(), IsVirtualItem = false, Recursive = true })
             .Where(i =>
             {
-                var d = FolderFor(i, out _);
-                return d != null && !HasTheme(d);
+                var d = FolderFor(i, out var why);
+                return (d != null && !HasTheme(d)) || (d == null && why != null);
             })
             .ToList();
     }

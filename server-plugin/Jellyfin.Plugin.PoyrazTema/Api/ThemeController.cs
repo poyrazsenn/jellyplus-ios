@@ -83,17 +83,20 @@ public class ThemeController : ControllerBase
             .Select(i =>
             {
                 store.TryGetValue(i.Id.ToString("N"), out var r);
+                var dir = FindThemesTask.FolderFor(i, out var why);
                 return new
                 {
                     ItemId = i.Id.ToString("N"),
                     i.Name,
                     Year = i.ProductionYear,
                     Type = i is MediaBrowser.Controller.Entities.TV.Series ? "Dizi" : "Film",
-                    Status = r?.Status ?? "waiting",
-                    r?.Message,
+                    Status = dir == null ? "skipped" : (r?.Status ?? "waiting"),
+                    Message = dir == null ? why : r?.Message,
+                    Folder = dir ?? (i is MediaBrowser.Controller.Entities.TV.Series ? i.Path : i.ContainingFolderPath),
                 };
             });
-        return Ok(new { Total = all.Count, Items = list });
+        var skipped = all.Count(i => FindThemesTask.FolderFor(i, out _) == null);
+        return Ok(new { Total = all.Count - skipped, Skipped = skipped, Items = list });
     }
 
     /// <summary>Tek bir yapım için hemen ara ve indir (gecelik sınırı beklemeden).</summary>

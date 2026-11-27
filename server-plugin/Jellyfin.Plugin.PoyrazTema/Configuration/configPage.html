@@ -115,16 +115,19 @@
                 var q = page.querySelector('#ptMissingQ').value.trim();
                 ApiClient.fetch({ type: 'GET', url: ApiClient.getUrl('PoyrazTema/Missing', q ? { q: q } : {}), dataType: 'json' })
                     .then(function (r) {
-                        page.querySelector('#ptMissingSummary').textContent = r.Total + ' yapımın tema müziği yok. '
+                        page.querySelector('#ptMissingSummary').innerHTML = esc(r.Total + ' yapımın tema müziği yok. '
                             + 'Görev her çalıştığında en yeni eklenenlerden başlayarak "Bir çalıştırmada en fazla" kadarını dener; '
-                            + 'beklemek istemediğin bir yapım için "Şimdi ara"ya bas.';
+                            + 'beklemek istemediğin bir yapım için "Şimdi ara"ya bas.')
+                            + (r.Skipped ? '<div style="margin-top:.5em;color:#ffb36b">' + r.Skipped + ' film atlandı: kendi klasöründe değil (aynı klasörde birden fazla film var). '
+                                + 'Jellyfin tema müziğini klasör başına tanıdığı için bu filmlere müzik konamaz; her filmi kendi klasörüne taşıman gerekir.</div>' : '');
                         var items = r.Items || [];
                         page.querySelector('#ptMissing').innerHTML = !items.length ? '<p style="opacity:.7">Bulunamadı.</p>' : items.map(function (i) {
                             return '<div class="paperList" style="padding:.7em 1em;margin-bottom:.5em;display:flex;gap:.8em;align-items:center;flex-wrap:wrap">'
                                 + '<div style="flex:1;min-width:200px"><b>' + esc(i.Name) + '</b>' + (i.Year ? ' (' + i.Year + ')' : '') + ' · ' + esc(i.Type)
                                 + ' · <span style="opacity:.75">' + (waitLabels[i.Status] || i.Status) + '</span>'
-                                + (i.Message ? '<div style="opacity:.6;font-size:.9em">' + esc(i.Message) + '</div>' : '') + '</div>'
-                                + '<button is="emby-button" class="raised emby-button" data-find="' + i.ItemId + '"><span>Şimdi ara</span></button>'
+                                + (i.Message ? '<div style="opacity:.6;font-size:.9em">' + esc(i.Message) + '</div>' : '')
+                                + (i.Status === 'skipped' && i.Folder ? '<div style="opacity:.5;font-size:.85em">Klasör: ' + esc(i.Folder) + '</div>' : '') + '</div>'
+                                + (i.Status === 'skipped' ? '' : '<button is="emby-button" class="raised emby-button" data-find="' + i.ItemId + '"><span>Şimdi ara</span></button>')
                                 + '</div>';
                         }).join('');
                     })
