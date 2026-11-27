@@ -11,7 +11,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool Series { get; set; } = true;
 
     /// <summary>Bir çalıştırmada en fazla kaç yapım denensin (YouTube'u yormamak için).</summary>
-    public int MaxPerRun { get; set; } = 40;
+    public int MaxPerRun { get; set; } = 150;
 
     /// <summary>Kabul edilen en kısa ve en uzun süre (saniye).</summary>
     public int MinSeconds { get; set; } = 30;

@@ -29,7 +29,7 @@
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="ptMax">Bir çalıştırmada en fazla</label>
                     <input id="ptMax" type="number" is="emby-input" min="1" max="500" />
-                    <div class="fieldDescription">YouTube'u yormamak için her gece bu kadar yapım denenir.</div>
+                    <div class="fieldDescription">Her çalıştırmada en yeni eklenenlerden başlayarak bu kadar yapım denenir. İlk kurulumda bütün kütüphaneyi bir kerede taramak için yükselt (ör. 1000).</div>
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="ptMin">En kısa süre (sn)</label>
@@ -53,6 +53,13 @@
                 </div>
                 <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Kaydet</span></button>
             </form>
+
+            <h2 class="sectionTitle" style="margin-top:2em">Teması olmayanlar</h2>
+            <div id="ptMissingSummary" style="margin-bottom:.6em;opacity:.8"></div>
+            <div class="inputContainer" style="max-width:420px">
+                <input id="ptMissingQ" type="search" is="emby-input" placeholder="Ada göre ara (ör. Once Upon a Time)" />
+            </div>
+            <div id="ptMissing"></div>
 
             <h2 class="sectionTitle" style="margin-top:2em">Durum</h2>
             <div id="ptSummary" style="margin-bottom:1em;opacity:.8"></div>
@@ -101,6 +108,50 @@
                 }).join('');
             }
 
+            var waitLabels = { waiting: 'Sırada', notfound: 'Bulunamadı', error: 'Hata', skipped: 'Atlandı' };
+            var qTimer = null;
+
+            function loadMissing() {
+                var q = page.querySelector('#ptMissingQ').value.trim();
+                ApiClient.fetch({ type: 'GET', url: ApiClient.getUrl('PoyrazTema/Missing', q ? { q: q } : {}), dataType: 'json' })
+                    .then(function (r) {
+                        page.querySelector('#ptMissingSummary').textContent = r.Total + ' yapımın tema müziği yok. '
+                            + 'Görev her çalıştığında en yeni eklenenlerden başlayarak "Bir çalıştırmada en fazla" kadarını dener; '
+                            + 'beklemek istemediğin bir yapım için "Şimdi ara"ya bas.';
+                        var items = r.Items || [];
+                        page.querySelector('#ptMissing').innerHTML = !items.length ? '<p style="opacity:.7">Bulunamadı.</p>' : items.map(function (i) {
+                            return '<div class="paperList" style="padding:.7em 1em;margin-bottom:.5em;display:flex;gap:.8em;align-items:center;flex-wrap:wrap">'
+                                + '<div style="flex:1;min-width:200px"><b>' + esc(i.Name) + '</b>' + (i.Year ? ' (' + i.Year + ')' : '') + ' · ' + esc(i.Type)
+                                + ' · <span style="opacity:.75">' + (waitLabels[i.Status] || i.Status) + '</span>'
+                                + (i.Message ? '<div style="opacity:.6;font-size:.9em">' + esc(i.Message) + '</div>' : '') + '</div>'
+                                + '<button is="emby-button" class="raised emby-button" data-find="' + i.ItemId + '"><span>Şimdi ara</span></button>'
+                                + '</div>';
+                        }).join('');
+                    })
+                    .catch(function () { page.querySelector('#ptMissingSummary').textContent = 'Liste alınamadı.'; });
+            }
+
+            page.querySelector('#ptMissingQ').addEventListener('input', function () {
+                clearTimeout(qTimer);
+                qTimer = setTimeout(loadMissing, 350);
+            });
+
+            page.querySelector('#ptMissing').addEventListener('click', function (e) {
+                var b = e.target.closest('[data-find]');
+                if (!b) return;
+                e.preventDefault();
+                b.disabled = true;
+                b.querySelector('span').textContent = 'Aranıyor…';
+                ApiClient.fetch({ type: 'POST', url: ApiClient.getUrl('PoyrazTema/Find', { itemId: b.getAttribute('data-find') }), dataType: 'json' })
+                    .then(function (r) {
+                        Dashboard.alert(r.Status === 'found'
+                            ? 'Bulundu ve indirildi: ' + (r.VideoTitle || r.Url)
+                            : (r.Message || 'Bulunamadı. Durum listesinden bağlantıyı elle verebilirsin.'));
+                        loadMissing(); load();
+                    })
+                    .catch(function () { Dashboard.alert('Arama başarısız oldu.'); loadMissing(); load(); });
+            });
+
             function load() {
                 ApiClient.fetch({ type: 'GET', url: ApiClient.getUrl('PoyrazTema/Status'), dataType: 'json' })
                     .then(function (l) { all = l || []; render(); })
@@ -121,6 +172,7 @@
                     Dashboard.hideLoadingMsg();
                 });
                 load();
+                loadMissing();
             });
 
             page.querySelector('#ptFilter').addEventListener('change', render);

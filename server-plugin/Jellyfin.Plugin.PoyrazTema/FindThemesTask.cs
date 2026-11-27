@@ -63,6 +63,34 @@ public class FindThemesTask : IScheduledTask
         return dir;
     }
 
+    /// <summary>Tema müziği olmayan ve henüz bulunmamış yapımlar (sırada bekleyenler).</summary>
+    public static List<BaseItem> Missing(ILibraryManager library, Configuration.PluginConfiguration cfg)
+    {
+        var kinds = new List<BaseItemKind>();
+        if (cfg.Movies)
+        {
+            kinds.Add(BaseItemKind.Movie);
+        }
+
+        if (cfg.Series)
+        {
+            kinds.Add(BaseItemKind.Series);
+        }
+
+        if (kinds.Count == 0)
+        {
+            return new();
+        }
+
+        return library.GetItemList(new InternalItemsQuery { IncludeItemTypes = kinds.ToArray(), IsVirtualItem = false, Recursive = true })
+            .Where(i =>
+            {
+                var d = FolderFor(i, out _);
+                return d != null && !HasTheme(d);
+            })
+            .ToList();
+    }
+
     public static bool HasTheme(string dir) =>
         File.Exists(Path.Combine(dir, "theme.mp3"))
         || File.Exists(Path.Combine(dir, "theme.m4a"))
@@ -127,7 +155,8 @@ public class FindThemesTask : IScheduledTask
             todo.Add((item, dir));
         }
 
-        todo = todo.Take(Math.Max(1, cfg.MaxPerRun)).ToList();
+        // En son eklenenler önce: yeni filmler ertesi sabah müzikli olsun
+        todo = todo.OrderByDescending(t => t.Item.DateCreated).Take(Math.Max(1, cfg.MaxPerRun)).ToList();
         _log.LogInformation("Poyraz Tema: {Count} yapım için tema aranacak", todo.Count);
         var got = 0;
         for (var i = 0; i < todo.Count; i++)
@@ -136,7 +165,7 @@ public class FindThemesTask : IScheduledTask
             var (item, dir) = todo[i];
             try
             {
-                var best = await FindBestAsync(item, cfg, cancellationToken).ConfigureAwait(false);
+                var best = await FindBestAsync(_finder, item, cfg, cancellationToken).ConfigureAwait(false);
                 if (best == null)
                 {
                     ThemeStore.Put(Rec(item, "notfound", null, null, "Uygun sonuç bulunamadı."));
@@ -169,7 +198,7 @@ public class FindThemesTask : IScheduledTask
         }
     }
 
-    private async Task<Candidate?> FindBestAsync(BaseItem item, Configuration.PluginConfiguration cfg, CancellationToken ct)
+    public static async Task<Candidate?> FindBestAsync(ThemeFinder finder, BaseItem item, Configuration.PluginConfiguration cfg, CancellationToken ct)
     {
         var names = new List<string> { item.Name };
         if (!string.IsNullOrWhiteSpace(item.OriginalTitle) && !string.Equals(item.OriginalTitle, item.Name, StringComparison.OrdinalIgnoreCase))
@@ -193,7 +222,7 @@ public class FindThemesTask : IScheduledTask
                 }
 
                 var q = $"{name} {(item is MediaBrowser.Controller.Entities.TV.Series ? string.Empty : year?.ToString(System.Globalization.CultureInfo.InvariantCulture))} {suffix}".Replace("  ", " ", StringComparison.Ordinal);
-                foreach (var c in await _finder.SearchAsync(q, 6, ct).ConfigureAwait(false))
+                foreach (var c in await finder.SearchAsync(q, 6, ct).ConfigureAwait(false))
                 {
                     var s = ThemeFinder.Score(c, names, year, cfg.MinSeconds, cfg.MaxSeconds);
                     if (s > bestScore)
