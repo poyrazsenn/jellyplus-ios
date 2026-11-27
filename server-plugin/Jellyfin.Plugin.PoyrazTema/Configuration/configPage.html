@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <title>Poyraz Tema</title>
+</head>
+<body>
+<div id="PoyrazTemaConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+    <div data-role="content">
+        <div class="content-primary">
+            <h2 class="sectionTitle">Poyraz Tema</h2>
+            <p>Tema müziği olmayan film ve dizileri YouTube'da arar ve klasörlerine <code>theme.mp3</code> olarak koyar.
+               Themerr'in bulduklarına dokunmaz; sadece boş kalanları doldurur. Her gece 03:00'te çalışır
+               (Pano → Zamanlanmış Görevler → <b>Eksik tema müziklerini bul</b>; oradan hemen de başlatabilirsin).</p>
+
+            <form id="PoyrazTemaConfigForm">
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input id="ptMovies" type="checkbox" is="emby-checkbox" />
+                        <span>Filmler</span>
+                    </label>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input id="ptSeries" type="checkbox" is="emby-checkbox" />
+                        <span>Diziler</span>
+                    </label>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ptMax">Bir çalıştırmada en fazla</label>
+                    <input id="ptMax" type="number" is="emby-input" min="1" max="500" />
+                    <div class="fieldDescription">YouTube'u yormamak için her gece bu kadar yapım denenir.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ptMin">En kısa süre (sn)</label>
+                    <input id="ptMin" type="number" is="emby-input" min="5" max="600" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ptMaxSec">En uzun süre (sn)</label>
+                    <input id="ptMaxSec" type="number" is="emby-input" min="30" max="1800" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ptRetry">Bulunamayanları kaç gün sonra yeniden dene</label>
+                    <input id="ptRetry" type="number" is="emby-input" min="1" max="365" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ptMovieSuf">Film araması ekleri (| ile ayır)</label>
+                    <input id="ptMovieSuf" type="text" is="emby-input" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ptSeriesSuf">Dizi araması ekleri (| ile ayır)</label>
+                    <input id="ptSeriesSuf" type="text" is="emby-input" />
+                </div>
+                <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Kaydet</span></button>
+            </form>
+
+            <h2 class="sectionTitle" style="margin-top:2em">Durum</h2>
+            <div id="ptSummary" style="margin-bottom:1em;opacity:.8"></div>
+            <div style="margin-bottom:1em">
+                <select id="ptFilter" is="emby-select" style="max-width:240px">
+                    <option value="todo">Bulunamayanlar ve hatalar</option>
+                    <option value="found">Bulunanlar</option>
+                    <option value="all">Hepsi</option>
+                </select>
+            </div>
+            <div id="ptList"></div>
+        </div>
+    </div>
+    <script type="text/javascript">
+        (function () {
+            var id = '5eacc010-65b0-4df5-b3de-6958a110efcb';
+            var page = document.querySelector('#PoyrazTemaConfigPage');
+            var all = [];
+            var labels = { found: 'Bulundu', manual: 'Elle seçildi', notfound: 'Bulunamadı', error: 'Hata', skipped: 'Atlandı' };
+
+            function esc(s) { return String(s || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+            function render() {
+                var f = page.querySelector('#ptFilter').value;
+                var list = all.filter(function (r) {
+                    if (f === 'all') return true;
+                    if (f === 'found') return r.Status === 'found' || r.Status === 'manual';
+                    return r.Status === 'notfound' || r.Status === 'error' || r.Status === 'skipped';
+                });
+                var c = { found: 0, notfound: 0, error: 0 };
+                all.forEach(function (r) { if (r.Status === 'found' || r.Status === 'manual') c.found++; else if (r.Status === 'notfound') c.notfound++; else if (r.Status === 'error') c.error++; });
+                page.querySelector('#ptSummary').textContent = c.found + ' bulundu · ' + c.notfound + ' bulunamadı · ' + c.error + ' hata';
+                if (!list.length) { page.querySelector('#ptList').innerHTML = '<p style="opacity:.7">Bu listede bir şey yok.</p>'; return; }
+                page.querySelector('#ptList').innerHTML = list.map(function (r) {
+                    var info = r.Status === 'found' || r.Status === 'manual'
+                        ? '<a href="' + esc(r.Url) + '" target="_blank" rel="noopener">' + esc(r.VideoTitle || r.Url) + '</a>'
+                        : esc(r.Message || '');
+                    return '<div class="paperList" style="padding:.8em 1em;margin-bottom:.6em">'
+                        + '<div><b>' + esc(r.Name) + '</b>' + (r.Year ? ' (' + r.Year + ')' : '') + ' · ' + esc(r.Type) + ' · <span style="opacity:.8">' + (labels[r.Status] || r.Status) + '</span></div>'
+                        + '<div style="opacity:.75;margin:.3em 0">' + info + '</div>'
+                        + '<div style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center">'
+                        + '<input is="emby-input" type="url" placeholder="YouTube bağlantısı yapıştır" data-url="' + r.ItemId + '" style="flex:1;min-width:220px" />'
+                        + '<button is="emby-button" class="raised emby-button" data-set="' + r.ItemId + '"><span>Bunu kullan</span></button>'
+                        + '<button is="emby-button" class="emby-button" data-retry="' + r.ItemId + '"><span>Yeniden ara</span></button>'
+                        + '</div></div>';
+                }).join('');
+            }
+
+            function load() {
+                ApiClient.fetch({ type: 'GET', url: ApiClient.getUrl('PoyrazTema/Status'), dataType: 'json' })
+                    .then(function (l) { all = l || []; render(); })
+                    .catch(function () { page.querySelector('#ptSummary').textContent = 'Durum alınamadı.'; });
+            }
+
+            page.addEventListener('pageshow', function () {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(id).then(function (c) {
+                    page.querySelector('#ptMovies').checked = c.Movies;
+                    page.querySelector('#ptSeries').checked = c.Series;
+                    page.querySelector('#ptMax').value = c.MaxPerRun;
+                    page.querySelector('#ptMin').value = c.MinSeconds;
+                    page.querySelector('#ptMaxSec').value = c.MaxSeconds;
+                    page.querySelector('#ptRetry').value = c.RetryDays;
+                    page.querySelector('#ptMovieSuf').value = c.MovieSuffixes;
+                    page.querySelector('#ptSeriesSuf').value = c.SeriesSuffixes;
+                    Dashboard.hideLoadingMsg();
+                });
+                load();
+            });
+
+            page.querySelector('#ptFilter').addEventListener('change', render);
+
+            page.querySelector('#ptList').addEventListener('click', function (e) {
+                var set = e.target.closest('[data-set]');
+                var retry = e.target.closest('[data-retry]');
+                if (set) {
+                    e.preventDefault();
+                    var itemId = set.getAttribute('data-set');
+                    var url = page.querySelector('[data-url="' + itemId + '"]').value.trim();
+                    if (!url) { Dashboard.alert('Önce bir YouTube bağlantısı yapıştır.'); return; }
+                    Dashboard.showLoadingMsg();
+                    ApiClient.fetch({ type: 'POST', url: ApiClient.getUrl('PoyrazTema/Set', { itemId: itemId, url: url }) })
+                        .then(function () { Dashboard.hideLoadingMsg(); Dashboard.alert('Tema müziği indirildi.'); load(); })
+                        .catch(function () { Dashboard.hideLoadingMsg(); Dashboard.alert('İndirilemedi. Bağlantıyı ve klasör izinlerini kontrol et.'); load(); });
+                } else if (retry) {
+                    e.preventDefault();
+                    ApiClient.fetch({ type: 'POST', url: ApiClient.getUrl('PoyrazTema/Retry', { itemId: retry.getAttribute('data-retry') }) })
+                        .then(function () { Dashboard.alert('Bir sonraki çalıştırmada yeniden aranacak.'); load(); });
+                }
+            });
+
+            page.querySelector('#PoyrazTemaConfigForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(id).then(function (c) {
+                    c.Movies = page.querySelector('#ptMovies').checked;
+                    c.Series = page.querySelector('#ptSeries').checked;
+                    c.MaxPerRun = parseInt(page.querySelector('#ptMax').value, 10) || 40;
+                    c.MinSeconds = parseInt(page.querySelector('#ptMin').value, 10) || 30;
+                    c.MaxSeconds = parseInt(page.querySelector('#ptMaxSec').value, 10) || 360;
+                    c.RetryDays = parseInt(page.querySelector('#ptRetry').value, 10) || 14;
+                    c.MovieSuffixes = page.querySelector('#ptMovieSuf').value;
+                    c.SeriesSuffixes = page.querySelector('#ptSeriesSuf').value;
+                    ApiClient.updatePluginConfiguration(id, c).then(Dashboard.processPluginConfigurationUpdateResult);
+                });
+                return false;
+            });
+        })();
+    </script>
+</div>
+</body>
+</html>

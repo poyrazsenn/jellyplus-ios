@@ -5,6 +5,12 @@ on:
   push:
     branches: [main, v2, v2.1]
     tags: ['v*']
+    paths-ignore:
+      - 'server-plugin/**'
+      - '.github/workflows/plugin.yml'
+      - 'tool/update_plugin_manifest.py'
+      - 'README.md'
+      - 'docs/**'
 
 permissions:
   contents: write

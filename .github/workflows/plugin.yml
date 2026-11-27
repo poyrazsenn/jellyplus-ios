@@ -1,0 +1,69 @@
+name: Poyraz Tema (Jellyfin eklentisi)
+
+on:
+  push:
+    branches: [v2, main]
+    paths:
+      - 'server-plugin/**'
+      - 'tool/update_plugin_manifest.py'
+      - '.github/workflows/plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Sürümü oku
+        id: ver
+        run: |
+          V=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' server-plugin/Jellyfin.Plugin.PoyrazTema/Jellyfin.Plugin.PoyrazTema.csproj | head -1)
+          echo "v=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Derle
+        run: dotnet publish server-plugin/Jellyfin.Plugin.PoyrazTema/Jellyfin.Plugin.PoyrazTema.csproj -c Release -o out
+
+      - name: Paketle
+        run: |
+          mkdir pkg
+          cp out/Jellyfin.Plugin.PoyrazTema.dll pkg/
+          cd pkg && zip -q ../poyraz-tema_${{ steps.ver.outputs.v }}.zip *
+          ls -la ..
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: poyraz-tema
+          path: poyraz-tema_${{ steps.ver.outputs.v }}.zip
+
+      - name: Bu sürüm daha önce yayınlandı mı
+        id: exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "tema-v${{ steps.ver.outputs.v }}" -R "${{ github.repository }}" >/dev/null 2>&1; then echo "yes=1" >> "$GITHUB_OUTPUT"; else echo "yes=0" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Yayınla
+        if: steps.exists.outputs.yes == '0'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tema-v${{ steps.ver.outputs.v }}
+          name: Poyraz Tema ${{ steps.ver.outputs.v }} (Jellyfin eklentisi)
+          body: |
+            Jellyfin 12 için tema müziği eklentisi. Kurulum: Pano → Eklentiler → Depolar → şu adresi ekle:
+            https://raw.githubusercontent.com/${{ github.repository }}/plugin-repo/manifest.json
+          files: poyraz-tema_${{ steps.ver.outputs.v }}.zip
+          make_latest: false
+
+      - name: Eklenti deposunu güncelle
+        if: steps.exists.outputs.yes == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tool/update_plugin_manifest.py "${{ github.repository }}" "${{ steps.ver.outputs.v }}" "poyraz-tema_${{ steps.ver.outputs.v }}.zip" "12.0.0.0"
