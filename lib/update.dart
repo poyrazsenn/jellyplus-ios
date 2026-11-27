@@ -86,7 +86,7 @@ Future<void> checkUpdate(BuildContext context, {bool manual = false}) async {
     for (final x in (jsonDecode(utf8.decode(r.bodyBytes)) as List).cast<Map>()) {
       if (x['draft'] == true || (!beta && x['prerelease'] == true)) continue;
       final t = '${x['tag_name'] ?? ''}';
-      if (t.isEmpty) continue;
+      if (t.isEmpty || !t.startsWith('v')) continue; // tema-v… gibi eklenti sürümlerini atla
       if (tag == null || compareVersions(t, tag) > 0) {
         tag = t;
         body = '${x['body'] ?? ''}';
