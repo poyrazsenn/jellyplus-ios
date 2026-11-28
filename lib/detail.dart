@@ -817,9 +817,9 @@ class _DetailScreenState extends State<DetailScreen> {
       ['Senaryo', names((p) => p['Type'] == 'Writer')],
       ['Türler', ((x['Genres'] as List?) ?? const []).join(', ')],
       ['Stüdyo', ((x['Studios'] as List?) ?? const []).map((s) => '${s['Name']}').join(', ')],
-      ['Yaş sınırı', '${x['OfficialRating'] ?? ''}'],
+      ['Yaş sınırı', ageText(x['OfficialRating'])],
       ['İçerik işaretleri', descs(x).map((k) => kDesc[k]).join(', ')],
-      ['Yayın', '${x['PremiereDate'] ?? ''}'.split('T').first],
+      ['Yayın', trDate(x['PremiereDate'])],
       ['Süre', rt(x['RunTimeTicks'])],
     ].where((r) => r[1].isNotEmpty).toList();
     final cast = people.where((p) => p['Type'] == 'Actor' || p['Type'] == 'Director').take(24).toList();

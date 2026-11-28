@@ -142,3 +142,21 @@ String backdrop(J it, {int w = 1600}) {
 }
 
 const kFields = 'Overview,Genres,OfficialRating,Tags';
+
+const kTrMonths = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+/// "2025-03-07T00:00:00Z" → "7 Mart 2025" (saat dilimi kaymasın diye sadece tarih kısmı)
+String trDate(dynamic v) {
+  final d = DateTime.tryParse('$v'.split('T').first);
+  return d == null ? '' : '${d.day} ${kTrMonths[d.month - 1]} ${d.year}';
+}
+
+/// "TR-13+" → "13 yaş ve üzeri", "TR-G" → "Genel izleyici kitlesi"; tanınmazsa olduğu gibi
+String ageText(dynamic r) {
+  final k = ageKey(r == null ? null : '$r');
+  if (k == null) return '${r ?? ''}';
+  if (k == 'all') return kAgeText['all']!;
+  // gerçek yaşı koru (TR-16+ → 16 yaş ve üzeri); harf etiketlerde (R, TV-MA) gruba düş
+  final n = RegExp(r'\d+').firstMatch('$r');
+  return n != null ? '${n.group(0)} yaş ve üzeri' : kAgeText[k]!;
+}
