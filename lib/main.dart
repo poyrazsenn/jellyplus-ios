@@ -587,13 +587,15 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final tablet = wideLayout(context);
     final mq = MediaQuery.of(context);
+    // Görünmeyen sekmelerde animasyonlar ve zamanlayıcılar durur (pil)
+    Widget t(int i, Widget w) => TickerMode(enabled: tab == i, child: tabNav(i, w));
     final stack = IndexedStack(index: tab, children: [
-      tabNav(0, const HomeScreen()),
-      tabNav(1, const SearchScreen()),
-      tabNav(2, const LibraryScreen(title: 'Listem', extra: '&IsFavorite=true', root: true)),
-      tabNav(3, const DownloadsScreen()),
-      tabNav(4, const SettingsScreen()),
-      tabNav(5, const ExploreScreen()),
+      t(0, const HomeScreen()),
+      t(1, const SearchScreen()),
+      t(2, const LibraryScreen(title: 'Listem', extra: '&IsFavorite=true', root: true)),
+      t(3, const DownloadsScreen()),
+      t(4, const SettingsScreen()),
+      t(5, const ExploreScreen()),
     ]);
     return PopScope(
       canPop: false,

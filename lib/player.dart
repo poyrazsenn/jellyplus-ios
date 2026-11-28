@@ -50,7 +50,13 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   final api = Api.I;
   late final Player player = Player(configuration: PlayerConfiguration(bufferSize: 64 * 1024 * 1024));
-  late final VideoController vctl = VideoController(player);
+  late final VideoController vctl = VideoController(
+    player,
+    configuration: const VideoControllerConfiguration(enableHardwareAcceleration: true),
+  );
+  /// mpv'nin kullandığı çözücü: videotoolbox = donanım (az pil), boş/no = yazılım (çok pil)
+  String hw = '';
+  Object? _lastSeg;
   final List<StreamSubscription> subs = [];
 
   J? it, ms;
@@ -103,6 +109,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
       player.stream.playing.listen((p) {
         if (p == playing) return;
         playing = p;
+        if (p && hw.isEmpty) {
+          Future.delayed(const Duration(seconds: 2), () async {
+            try {
+              final v = await (player.platform as dynamic).getProperty('hwdec-current');
+              if (mounted) setState(() => hw = '$v');
+            } catch (_) {}
+          });
+        }
         if (ready) _report('/Progress');
         if (mounted) setState(() {});
         if (p) _armHide();
@@ -159,8 +173,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       player.seek(s.b);
     }
     _checkCountdown(s);
-    // ekranı en fazla ~4 kez/sn yenile
+    // ekranı en fazla ~4 kez/sn yenile; kontroller gizliyken hiç yenileme (pil)
     if (dragging) return;
+    final shown = ui || epsOpen || viewOpen || tracksOpen;
+    if (!shown && identical(s, _lastSeg)) return;
+    _lastSeg = s;
     if ((pos - painted).abs() >= const Duration(milliseconds: 250) || pos < painted) {
       painted = pos;
       setState(() {});
@@ -337,6 +354,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final v = _video, m = ms;
     final a = streams.where((s) => s['Index'] == audioIdx).toList();
     final src = [
+      if (hw.isNotEmpty) 'Çözücü: ${hw == 'no' ? 'yazılım' : 'donanım ($hw)'}',
       '${m?['Container'] ?? '?'}'.toUpperCase(),
       '${v?['Codec'] ?? '?'}'.toUpperCase(),
       if (v?['Width'] != null) '${v?['Width']}×${v?['Height']}',
@@ -740,6 +758,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               boxShadow: [BoxShadow(color: Color(0x80000000), blurRadius: 50, offset: Offset(0, 20))],
             ),
             child: Glass(
+              blur: 0,
               radius: 22,
               color: const Color(0xDB202026),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1150,6 +1169,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           ]),
                         ),
                         Glass(
+              blur: 0,
                           radius: 24,
                           padding: const EdgeInsets.all(4),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1175,6 +1195,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                       haptic: true,
                                       onTap: _togglePlay,
                                       child: Glass(
+              blur: 0,
                                         radius: 42,
                                         color: const Color(0x7326262C),
                                         child: SizedBox(
@@ -1219,6 +1240,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   opacity: hud ? 1 : 0,
                   duration: const Duration(milliseconds: 200),
                   child: Glass(
+              blur: 0,
                     radius: 26,
                     child: SizedBox(
                       width: 52,
@@ -1291,6 +1313,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: kInk)),
               )
             : Glass(
+              blur: 0,
                 radius: 21,
                 color: const Color(0x9926262C),
                 child: Container(
@@ -1614,6 +1637,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: GestureDetector(
           onTap: () {},
           child: Glass(
+              blur: 0,
             radius: 26,
             color: const Color(0xD920202A),
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
@@ -1658,6 +1682,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final ds = descs(i);
     final line = [if (a != null) a, ...ds.map((d) => kDesc[d]!)].join(' · ');
     return Glass(
+              blur: 0,
       radius: 14,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       child: Text(line, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),

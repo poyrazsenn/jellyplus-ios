@@ -27,6 +27,9 @@ Future<void> openItem(BuildContext c, J it) async {
 Future<void> openLibrary(BuildContext c, String title, String extra) =>
     Navigator.of(c).push(MaterialPageRoute(builder: (_) => LibraryScreen(title: title, extra: extra)));
 
+/// Oynatıcı açıkken arka plandaki ekranlar (vitrin vb.) kendini durdurur.
+final playerOpen = ValueNotifier<bool>(false);
+
 Future<void> openPlayer(BuildContext c, J it, {bool restart = false}) async {
   // Dizi/sezon/koleksiyonun kendi dosyası yok → önce sayfasına git
   if (['Series', 'Season', 'BoxSet', 'Folder', 'CollectionFolder'].contains(it['Type'])) {
@@ -34,6 +37,7 @@ Future<void> openPlayer(BuildContext c, J it, {bool restart = false}) async {
     return;
   }
   ThemeMusic.I.stop(hard: true);
+  playerOpen.value = true;
   // Apple TV gibi: oynatıcı yumuşakça büyüyerek açılır, kapanırken küçülerek kaybolur
   await Navigator.of(c, rootNavigator: true).push(PageRouteBuilder(
     opaque: true,
@@ -49,6 +53,7 @@ Future<void> openPlayer(BuildContext c, J it, {bool restart = false}) async {
       );
     },
   ));
+  playerOpen.value = false;
   refreshBus.value++;
 }
 

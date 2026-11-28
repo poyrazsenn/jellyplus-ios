@@ -20,6 +20,8 @@ class Discover {
   Api get api => Api.I;
 
   List<J>? _top;
+  List<J>? _lib;
+  DateTime _libAt = DateTime(2000);
   DateTime _topAt = DateTime(2000);
 
   /// Son durum (ana sayfada açıklama göstermek için): '', seerr, err, none
@@ -43,8 +45,12 @@ class Discover {
       topNote = 'err';
       return const [];
     }
-    final lib = await api.items('/Users/$u/Items?IncludeItemTypes=Movie,Series&Recursive=true'
-        '&Fields=ProviderIds,OriginalTitle,$kFields&EnableImageTypes=Primary,Backdrop,Thumb,Logo&ImageTypeLimit=1');
+    if (_lib == null || DateTime.now().difference(_libAt).inHours >= 6) {
+      _lib = await api.items('/Users/$u/Items?IncludeItemTypes=Movie,Series&Recursive=true'
+          '&Fields=ProviderIds,OriginalTitle&EnableImages=false&EnableUserData=false');
+      _libAt = DateTime.now();
+    }
+    final lib = _lib!;
     final byTmdb = <String, J>{};
     final byName = <String, J>{};
     for (final x in lib) {
@@ -67,6 +73,14 @@ class Discover {
       if (out.length == 10) break;
     }
     if (out.isEmpty) topNote = 'none';
+    if (out.isNotEmpty) {
+      // ayrıntı ve görseller sadece bu 10 yapım için
+      final full = await api.items('/Users/$u/Items?Ids=${out.map((j) => j['Id']).join(',')}&Fields=$kFields');
+      final byId = {for (final j in full) '${j['Id']}': j};
+      for (var i = 0; i < out.length; i++) {
+        out[i] = byId['${out[i]['Id']}'] ?? out[i];
+      }
+    }
     _top = out;
     _topAt = DateTime.now();
     return out;

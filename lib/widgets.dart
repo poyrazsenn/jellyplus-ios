@@ -93,7 +93,20 @@ class Glass extends StatelessWidget {
   final double blur;
   const Glass({super.key, required this.child, this.radius = 20, this.padding, this.color = kGlass, this.blur = 22});
   @override
-  Widget build(BuildContext context) => ClipRRect(
+  Widget build(BuildContext context) {
+    if (blur <= 0) {
+      // Bulanıklıksız: video gibi her karede değişen bir şeyin üstünde pil yemesin
+      return Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: color.withAlpha(0xD9),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: Colors.white.withAlpha(30)),
+        ),
+        child: child,
+      );
+    }
+    return ClipRRect(
         borderRadius: BorderRadius.circular(radius),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
@@ -108,6 +121,7 @@ class Glass extends StatelessWidget {
           ),
         ),
       );
+  }
 }
 
 /// Basınca hafifçe küçülen dokunma alanı (dalga efekti yerine, iOS gibi)
@@ -478,6 +492,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
     if (n > 1) {
       t = Timer.periodic(const Duration(seconds: 8), (_) {
         if (!mounted || !pc.hasClients) return;
+        // görünmüyorsa (başka sekme, üstte sayfa ya da oynatıcı açık) boşuna kaydırıp resim çözmesin
+        if (playerOpen.value || !TickerMode.of(context) || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
         if (DateTime.now().difference(touched).inSeconds < 7) return;
         pc.nextPage(duration: const Duration(milliseconds: 800), curve: Curves.easeInOutCubic);
       });
